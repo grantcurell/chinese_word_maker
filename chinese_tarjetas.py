@@ -14,6 +14,7 @@ import pprint
 
 def output_words(output_file_name, word_list):
     """
+    Outputs the new words to a file for import into Anki
 
     :param str output_file_name: The name of the file to which we want to write the new words
     :param list word_list: The list of words we want to write to file
@@ -131,7 +132,7 @@ def main():
 
     pp = pprint.PrettyPrinter(indent=4)
 
-    parser = ArgumentParser(description = "Used to create Anki flash cards based on data from the website www.mdbg.net")
+    parser = ArgumentParser(description="Used to create Anki flash cards based on data from the website www.mdbg.net")
     parser.add_argument('--file', metavar='FILE', dest="input_file_name", type=str, required=True,
                         help='The path to a newline delimited list of Chinese words in Hanji')
     parser.add_argument('--output-file', metavar='OUTPUT-FILE', dest="output_file_name", type=str, required=False,
@@ -140,6 +141,7 @@ def main():
     args = parser.parse_args()  # type: argparse.Namespace
 
     output_words(args.output_file_name, get_words(args.input_file_name))
+
 
 if __name__ == '__main__':
     main()

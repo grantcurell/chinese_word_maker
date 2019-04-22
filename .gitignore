@@ -23,3 +23,5 @@ AutoDefine\.py
 word_list
 
 tarjetaui/__pycache__/
+
+*.txt
