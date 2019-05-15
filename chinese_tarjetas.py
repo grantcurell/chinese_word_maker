@@ -27,10 +27,10 @@ def output_words(output_file_name, word_list):
 
             # You need the <br/>s in anki for newlines. The strip makes sure there isn't one randomly trailing
             output_file.write(word["traditional"] + "," + word["simplified"] + "," + word["pinyin"] + "," +
-                              "<br/>".join(word["defs"]).replace(",", "") + "," + word["hsk"].replace(" ", "") + "\n")
+                              "<br>".join(word["defs"]).replace(",", "") + "," + word["hsk"].replace(" ", "") + "\n")
 
             print("Writing: " + word["traditional"] + "," + word["simplified"] + "," + word["pinyin"] + "," +
-                  "<br/>".join(word["defs"]) + "," + word["hsk"])
+                  "<br>".join(word["defs"]) + "," + word["hsk"])
 
 
 def get_words(input_file_name):
@@ -73,17 +73,22 @@ def get_words(input_file_name):
                 print("It looks like there are multiple definitions for this word available. Which one would you like"
                       " to use?")
 
+                print("\n\n-------- Option 0 ---------\n\n")
+                print("Type 0 to skip.")
+
                 for index, entry in enumerate(entries):
                     print("\n\n-------- Option " + str(index+1) + "---------\n\n")
                     pp.pprint(entry)
 
                 print("\n\n")
-                selection = 0  # type: int
+                selection = -1  # type: int
 
-                while selection > len(entries) or selection < 1:
+                while (selection > len(entries) or selection < 1) and selection != 0:
                     selection = int(input("Enter your selection: "))
 
-                new_words.append(entries[selection-1])
+                if selection != 0:
+                    new_words.append(entries[selection-1])
+
             else:
                 new_words.append(entries[0])
 
