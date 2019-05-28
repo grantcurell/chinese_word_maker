@@ -12,12 +12,13 @@ from bs4 import BeautifulSoup
 import pprint
 
 
-def output_words(output_file_name, word_list):
+def output_words(output_file_name, word_list, args):
     """
     Outputs the new words to a file for import into Anki
 
     :param str output_file_name: The name of the file to which we want to write the new words
     :param list word_list: The list of words we want to write to file
+    :param argparse.Namespace args: Arguments passed on the command line
     :return: Returns nothing
     """
 
@@ -33,11 +34,12 @@ def output_words(output_file_name, word_list):
                   "<br>".join(word["defs"]) + "," + word["hsk"])
 
 
-def get_words(input_file_name):
+def get_words(input_file_name, args):
     """
     Reaches out to www.mdbg.net and grabs the data for each of the words on which you want data
 
     :param str input_file_name: The name of the file which contains the words we want to grab
+    :param argparse.Namespace args: Arguments passed on the command line
     :return: Returns a list of the words you want added to Anki with their corresponding data
     :rtype: list
     """
@@ -69,7 +71,7 @@ def get_words(input_file_name):
 
                 entries.append(process_entry(entry))
 
-            if len(entries) > 1:
+            if len(entries) > 1 and args.skip_choices is not True:
                 print("It looks like there are multiple definitions for this word available. Which one would you like"
                       " to use?")
 
@@ -89,7 +91,7 @@ def get_words(input_file_name):
                 if selection != 0:
                     new_words.append(entries[selection-1])
 
-            else:
+            elif len(entries) == 1:
                 new_words.append(entries[0])
 
     return new_words
@@ -135,17 +137,18 @@ def process_entry(entry):
 
 def main():
 
-    pp = pprint.PrettyPrinter(indent=4)
-
     parser = ArgumentParser(description="Used to create Anki flash cards based on data from the website www.mdbg.net")
     parser.add_argument('--file', metavar='FILE', dest="input_file_name", type=str, required=True,
                         help='The path to a newline delimited list of Chinese words in Hanji')
     parser.add_argument('--output-file', metavar='OUTPUT-FILE', dest="output_file_name", type=str, required=False,
                         default="word_list.txt",
-                        help='by default this is word_list.txt. You may change it by providing this argument.')
+                        help='By default this is word_list.txt. You may change it by providing this argument.')
+    parser.add_argument('--skip-choices', dest="skip_choices", required=False, action='store_true',
+                        help='This option will skip all choices and ignore the words for which a choice would have '
+                             'been made.')
     args = parser.parse_args()  # type: argparse.Namespace
 
-    output_words(args.output_file_name, get_words(args.input_file_name))
+    output_words(args.output_file_name, get_words(args.input_file_name, args), args)
 
 
 if __name__ == '__main__':
