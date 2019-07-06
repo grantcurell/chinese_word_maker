@@ -62,6 +62,8 @@ def output_words(words_output_file_name, word_list):
     :return: Returns nothing
     """
 
+    logging.info("Outputting words.")
+
     with open(words_output_file_name, 'w', encoding="utf-8-sig") as output_file:
 
         for word in word_list:
@@ -83,6 +85,8 @@ def output_characters(chars_output_file_name, char_images_folder, char_list):
     :param list char_list: The list of characters we want to write to file
     :return: Returns nothing
     """
+
+    logging.info("Outputting characters.")
 
     # Create target directory if don't exist
     if not os.path.exists(char_images_folder):
