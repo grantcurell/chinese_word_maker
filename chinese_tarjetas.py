@@ -387,9 +387,7 @@ def process_char_entry(book, images, char):
                     if content is not None:
                         organized_entry["traditionalcomponents"] = str(content.find_next())
                     else:
-                        logging.warning("Warning! We were unable to find a character for " + char)
-                        if not query_yes_no("Do you want to continue?"):
-                            exit(0)
+                        logging.info("No components found for character " + char + ".")
 
                 logging.debug("MATCH FOUND")
 
