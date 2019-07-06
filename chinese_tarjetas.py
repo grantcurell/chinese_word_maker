@@ -1,28 +1,68 @@
 __author__ = "Grant Curell"
 __copyright__ = "Do what you want with it"
 
-__license__ = "GPL"
-__version__ = "1.0.0"
+__license__ = "GPLv3"
+__version__ = "1.1.0"
 __maintainer__ = "Grant Curell"
 
 from argparse import ArgumentParser
 from urllib.request import urlopen
 from urllib.parse import quote
 from bs4 import BeautifulSoup
+import ebooklib
+from ebooklib import epub
+import traceback
+import logging
 import pprint
+import os
+import ntpath
+import sys
+import re
+from datetime import datetime
 
 
-def output_words(output_file_name, word_list, args):
+def query_yes_no(question, default="yes"):
+    """
+    Ask a yes/no question via raw_input() and return the answer.
+
+    :param question str A string that is presented to the user.
+    :param default is the presumed answer if the user just hits <Enter>.
+    :return The "answer" return value is True for "yes" or False for "no".
+    :rtype bool
+    """
+    valid = {"yes": True, "y": True, "ye": True,
+             "no": False, "n": False}
+    if default is None:
+        prompt = " [y/n] "
+    elif default == "yes":
+        prompt = " [Y/n] "
+    elif default == "no":
+        prompt = " [y/N] "
+    else:
+        raise ValueError("invalid default answer: '%s'" % default)
+
+    while True:
+        sys.stdout.write(question + prompt)
+        choice = input().lower()
+        if default is not None and choice == '':
+            return valid[default]
+        elif choice in valid:
+            return valid[choice]
+        else:
+            sys.stdout.write("Please respond with 'yes' or 'no' "
+                             "(or 'y' or 'n').\n")
+
+
+def output_words(words_output_file_name, word_list):
     """
     Outputs the new words to a file for import into Anki
 
-    :param str output_file_name: The name of the file to which we want to write the new words
+    :param str words_output_file_name: The name of the file to which we want to write the new words
     :param list word_list: The list of words we want to write to file
-    :param argparse.Namespace args: Arguments passed on the command line
     :return: Returns nothing
     """
 
-    with open(output_file_name, 'a+', encoding="utf-8") as output_file:
+    with open(words_output_file_name, 'w', encoding="utf-8-sig") as output_file:
 
         for word in word_list:
 
@@ -30,8 +70,100 @@ def output_words(output_file_name, word_list, args):
             output_file.write(word["traditional"] + "," + word["simplified"] + "," + word["pinyin"] + "," +
                               "<br>".join(word["defs"]).replace(",", "") + "," + word["hsk"].replace(" ", "") + "\n")
 
-            print("Writing: " + word["traditional"] + "," + word["simplified"] + "," + word["pinyin"] + "," +
-                  "<br>".join(word["defs"]) + "," + word["hsk"])
+            logging.info("Writing: " + word["traditional"] + "," + word["simplified"] + "," + word["pinyin"] + "," +
+                         "<br>".join(word["defs"]) + "," + word["hsk"])
+
+
+def output_characters(chars_output_file_name, char_images_folder, char_list):
+    """
+    Outputs the new characters to a file for import into Anki
+
+    :param str chars_output_file_name: The name of the file to which we want to write the new characters
+    :param str char_images_folder: The folder which will store the images associated with the character images
+    :param list char_list: The list of characters we want to write to file
+    :return: Returns nothing
+    """
+
+    # Create target directory if don't exist
+    if not os.path.exists(char_images_folder):
+        os.mkdir(char_images_folder)
+        logging.info("Directory " + char_images_folder + " Created ")
+
+    with open(chars_output_file_name, 'w', encoding="utf-8-sig") as output_file:
+
+        for character in char_list:
+
+            # Write the image for the character out to disk. The module ntpath ensures this is portable to Linux
+            # or Windows. The line directly below is necessary to ensure the filename is unique
+            filename = str(int(datetime.now().timestamp())) + "-" + ntpath.basename(
+                character["image"].file_name).replace("jpeg", "jpg")  # type: str
+            with open(os.path.join(char_images_folder, filename), "wb") as img_file:
+                img_file.write(character["image"].content)  # Output the image to disk
+
+            if "simplified" not in character:
+                character["simplified"] = ""
+            if "defs" not in character:
+                character["defs"] = ""
+            if "mnemonics" not in character:
+                character["mnemonics"] = ""
+            if "story" not in character:
+                character["story"] = ""
+            if "examples" not in character:
+                character["examples"] = ""
+            if "additionalinfo" not in character:
+                character["additionalinfo"] = ""
+            if "simplifiedcomponents" not in character:
+                character["simplifiedcomponents"] = ""
+            if "traditionalcomponents" not in character:
+                character["traditionalcomponents"] = ""
+
+            character_cleaned = {}
+
+            # Replace any newlines in the text with HTML line breaks
+            for key, value in character.items():
+                if key != "image":  # The image value has no replace capability so we have to skip it
+                    character_cleaned[key] = value.replace("\n", "<br>")
+
+            delimiter = '\\'
+
+            # The only if conditions ensure that if a field is missing because it isn't part of a page that an error
+            # isn't thrown.
+            output_file.write(
+                character_cleaned["traditional"] + delimiter +
+                character_cleaned["simplified"] + delimiter +
+                character_cleaned["defs"] + delimiter +
+                character_cleaned["pinyin"] + delimiter +
+                character_cleaned["soundword"] + delimiter +
+                "<img src=\"" + filename + "\" />" + delimiter +
+                character_cleaned["mnemonics"] + delimiter +
+                character_cleaned["story"] + delimiter +
+                character_cleaned["examples"] + delimiter +
+                character_cleaned["additionalinfo"] + delimiter +
+                character_cleaned["simplifiedcomponents"] + delimiter +
+                character_cleaned["traditionalcomponents"] +
+                "\n"
+            )
+
+            if logging.getLogger().level == logging.DEBUG:
+                logging.debug("\n-------------------------------------------\n")
+                logging.debug("Writing: " +
+                              character_cleaned["simplified"] + delimiter +
+                              character_cleaned["traditional"] + delimiter +
+                              character_cleaned["defs"] + delimiter +
+                              character_cleaned["pinyin"] + delimiter +
+                              character_cleaned["soundword"] + delimiter +
+                              "<img src=" + filename + "/>" + delimiter +
+                              character_cleaned["mnemonics"] + delimiter +
+                              character_cleaned["story"] + delimiter +
+                              character_cleaned["examples"] + delimiter +
+                              character_cleaned["additionalinfo"] + delimiter +
+                              character_cleaned["simplifiedcomponents"] + delimiter +
+                              character_cleaned["traditionalcomponents"] +
+                              "\n"
+                              )
+                logging.debug("\n-------------------------------------------\n")
+            else:
+                logging.info("Writing the character: " + character["traditional"])
 
 
 def get_words(input_file_name, args):
@@ -44,60 +176,241 @@ def get_words(input_file_name, args):
     :rtype: list
     """
 
-    with open(input_file_name, encoding="utf-8") as input_file:
+    with open(input_file_name, encoding="utf-8-sig") as input_file:
 
         new_words = []  # type: list
+        new_chars = []  # type: list
         pp = pprint.PrettyPrinter(indent=4)
+        book = None
+
+        if args.ebook_path:
+            book = epub.read_epub(args.ebook_path)  # type: ebooklib.epub.EpubBook
+            images = book.get_items_of_media_type('image/jpeg')  # type: generator
 
         for word in input_file.readlines():
 
-            word = word.strip()  # type: str
+            try:
+                word = word.strip()  # type: str
 
-            print("Requested word is: " + word)
-            print("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word)
+                # Handle words and characters differently. For individual characters, there is a special feature for
+                # looking them up in the book Chinese Blockbuster and making flashcards. This will only be active if
+                # the ebook_path is provided on the command line.
+                if len(word) <= 2 and book is not None:
+                    new_char = process_char_entry(book, images, word)
+                    if new_char is not None:
+                        new_chars.append(new_char)
+                else:
 
-            url_string = "https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" \
-                         + quote(word)  # type: str
+                    logging.info("Requested word is: " + word)
+                    logging.info("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word)
 
-            html = urlopen(url_string).read().decode('utf-8')  # type: str
+                    url_string = "https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" \
+                                 + quote(word)  # type: str
 
-            soup = BeautifulSoup(html, 'html.parser')  # type: bs4.BeautifulSoup
+                    html = urlopen(url_string).read().decode('utf-8')  # type: str
 
-            results = soup.find_all("tr", {"class": "row"})  # type: bs4.element.ResultSet
+                    soup = BeautifulSoup(html, 'html.parser')  # type: bs4.BeautifulSoup
 
-            entries = []  # type: list
+                    results = soup.find_all("tr", {"class": "row"})  # type: bs4.element.ResultSet
 
-            for entry in results:
+                    entries = []  # type: list
 
-                entries.append(process_entry(entry))
+                    for entry in results:
 
-            if len(entries) > 1 and args.skip_choices is not True:
-                print("It looks like there are multiple definitions for this word available. Which one would you like"
-                      " to use?")
+                        entries.append(process_word_entry(entry))
 
-                print("\n\n-------- Option 0 ---------\n\n")
-                print("Type 0 to skip.")
+                    if len(entries) > 1 and args.skip_choices is not True:
+                        print( "It looks like there are multiple definitions for this word available. "
+                               "Which one would you like to use?")
 
-                for index, entry in enumerate(entries):
-                    print("\n\n-------- Option " + str(index+1) + "---------\n\n")
-                    pp.pprint(entry)
+                        print("\n\n-------- Option 0 ---------\n\n")
+                        print("Type 0 to skip.")
 
-                print("\n\n")
-                selection = -1  # type: int
+                        for index, entry in enumerate(entries):
+                            print("\n\n-------- Option " + str(index+1) + "---------\n\n")
+                            pp.pprint(entry)
 
-                while (selection > len(entries) or selection < 1) and selection != 0:
-                    selection = int(input("Enter your selection: "))
+                        print("\n\n")
+                        selection = -1  # type: int
 
-                if selection != 0:
-                    new_words.append(entries[selection-1])
+                        while (selection > len(entries) or selection < 1) and selection != 0:
+                            selection = int(input("Enter your selection: "))
 
-            elif len(entries) == 1:
-                new_words.append(entries[0])
+                        if selection != 0:
+                            new_words.append(entries[selection-1])
 
-    return new_words
+                    elif len(entries) == 1:
+                        new_words.append(entries[0])
+            except KeyboardInterrupt:
+                if not query_yes_no("You have pressed ctrl+C. Are you sure you want to exit?"):
+                    exit(0)
+            # Because you could spend a lot of time working on this we want to avoid program termination at all costs
+            # Because of this we catch all exceptions and provide the option to continue or not.
+            except:
+                traceback.print_exc()
+                logging.error("Uh oh. We've run into a problem, but we're trying to stop the program from terminating "
+                              "on you!")
+                if not query_yes_no(
+                        "We have caught an unknown exception but prevented the program from terminating. "
+                        "Do you want to continue with the next word?"):
+                    exit(1)
+
+    return new_words, new_chars
 
 
-def process_entry(entry):
+def process_char_entry(book, images, char):
+    """
+    Reads from an EPUB formatted version of the Chinese Blockbuster series
+
+    :param EpubBook book: An open handle to the EPUB formatted book to use
+    :param generator images: A variable containing all the images listed in the ebook
+    :param str char: The Character we want to process
+    :return: Returns a list of the characters you want added to Anki with their corresponding data. Returns none
+             if the character could not be found.
+    :rtype: list
+    """
+
+    logging.info("-------------------------------------")
+    logging.info("Processing character: " + char)
+
+    # Used to track whether we found the character
+    found_char = False
+
+    organized_entry = {}  # type: dict
+
+    # continued = False  # type: bool
+
+    for doc in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+
+        content = doc.content.decode('utf-8')
+        logging.debug(content)
+
+        # This may seem redundant with the following conditional statement, but I figured it would be faster to do
+        # a quick character search in place of parsing everything into Beautiful Soup for every run of the loop
+        if char in content:
+            soup = BeautifulSoup(content, 'lxml')  # type: bs4.BeautifulSoup
+            character_header = soup.select_one(
+                '.p_chinese_char:contains("' + char + '")')  # type: bs4.element.Tag
+
+            # The ID of the image is stored as the top level directory name inside the document. This next portion
+            # grabs that number in an OS safe way. We will need this for both images and uniquely identifying the
+            # calibre classes.
+            top_level_dir = doc.file_name
+
+            # Get the top level directory from the file path
+            while os.path.split(top_level_dir)[0] != "":
+                top_level_dir = os.path.split(top_level_dir)[0]
+
+            # Calibre uses a different style sheet for each combined book. Since in my case I combined several
+            # volumes together they each have different style sheets. This is expressed in different calibreXXX
+            # classes. The solution is to prepend the identifier to the class and update the style sheet.
+            for calibre_element in soup.find_all(class_=re.compile("^calibre[0-9]{1,3}")):
+                calibre_element.attrs["class"][0] = "id_" + top_level_dir + "_" + calibre_element.attrs["class"][0]
+
+            if character_header is not None:
+
+                found_char = True
+                logging.info("Found character " + char + " in the book!")
+
+                character_header = character_header.text.split('[')
+
+                # Get the character from the text
+                if len(character_header) == 2:
+                    organized_entry["simplified"] = "/" + character_header[0]
+                    organized_entry["traditional"] = character_header[1].strip("]")
+                elif len(character_header) == 1:
+                    organized_entry["traditional"] = character_header[0]
+                elif len(character_header) > 2:
+                    logging.warning("Anomalous behavior detected. This array should never have more than two "
+                                    "characters. This is a non-fatal error, but it is strange.")
+                    if not query_yes_no("Anomalous behavior detected. Do you want to continue?"):
+                        exit(0)
+                    for line in traceback.format_stack():
+                        logging.debug(line.strip())
+
+                # Get the rest of the data
+                for heading in soup.findAll("p", {"class": "p_cat_heading"}):
+
+                    content = ""  # type: str
+
+                    for temp_heading in heading.find_next_siblings():
+                        # The below stops as soon as we reach the next instance of p_cat_heading or we reach an element
+                        # with an image as a child which we also don't want to capture
+                        if "p_cat_heading" in temp_heading.attrs["class"][0] \
+                                or "img" in str(list(temp_heading.descendants)):
+                            break
+                        else:
+                            logging.debug(str(temp_heading))
+                            content += str(temp_heading)
+
+                    text = heading.text.strip()  # type: str
+
+                    if text == "DEFINITION":
+                        organized_entry["defs"] = content
+                    elif text == "PRONUNCIATION":
+                        organized_entry["pinyin"] = content
+                    elif text == "MNEMONICS":
+                        organized_entry["mnemonics"] = content
+                    elif text == "SOUND WORD":
+                        organized_entry["soundword"] = content
+                    elif text == "STORY":
+                        organized_entry["story"] = content
+                    elif text == "EXAMPLES":
+                        organized_entry["examples"] = content
+                    elif text == "WANT A LITTLE MORE?":
+                        organized_entry["additionalinfo"] = content
+
+                # Search through the EPUB's images and find the one that is used on our page.
+                image_name = ntpath.basename(soup.find("img").attrs['src'])  # Grab the image name
+
+                organized_entry["image"] = book.get_item_with_href(top_level_dir + "/images/" + image_name)
+
+                # Get the text for simplified components
+                content = soup.select_one(
+                    '.p_cat_heading__and__centre_alignment:contains("SIMPLIFIED COMPONENTS")')   # type: bs4.element.Tag
+
+                if content is not None:
+                    organized_entry["simplifiedcomponents"] = str(content.find_next())
+
+                # Get the headings for traditional components
+                content = soup.select_one(
+                    '.p_cat_heading__and__centre_alignment:contains("TRADITIONAL COMPONENTS")')  # type: bs4.element.Tag
+
+                if content is not None:
+                    organized_entry["traditionalcomponents"] = str(content.find_next())
+
+                # If both of the above are none that means that there are no particular components
+                if "traditionalcomponents" not in organized_entry and "simplifiedcomponents" not in organized_entry:
+                    content = soup.select_one(
+                        '.p_cat_heading__and__centre_alignment:contains("COMPONENTS")')  # type: bs4.element.Tag
+
+                    if content is not None:
+                        organized_entry["traditionalcomponents"] = str(content.find_next())
+                    else:
+                        logging.warning("Warning! We were unable to find a character for " + char)
+                        if not query_yes_no("Do you want to continue?"):
+                            exit(0)
+
+                logging.debug("MATCH FOUND")
+
+            # TODO Need to extend this to handle the situation that there are multiple duplicate characters
+            """
+            if continued:
+                break
+            else:
+                continued = True
+                continue
+            """
+
+    if not found_char:
+        logging.warning("Did not find character " + char + " in the book!")
+        return None
+
+    logging.info("Found all of character " + char + "'s information")
+    return organized_entry
+
+
+def process_word_entry(entry):
     """
     Processes a single row from www.mbdg.net and returns it in a dictionary
 
@@ -106,7 +419,7 @@ def process_entry(entry):
     :rtype: list of dicts
     """
 
-    organized_entry = {}
+    organized_entry = {}  # type: dict
 
     organized_entry.update({"traditional": entry.find("td", {"class": "head"}).find("div", {"class": "hanzi"}).text})
 
@@ -139,16 +452,59 @@ def main():
 
     parser = ArgumentParser(description="Used to create Anki flash cards based on data from the website www.mdbg.net")
     parser.add_argument('--file', metavar='FILE', dest="input_file_name", type=str, required=True,
-                        help='The path to a newline delimited list of Chinese words in Hanji')
-    parser.add_argument('--output-file', metavar='OUTPUT-FILE', dest="output_file_name", type=str, required=False,
-                        default="word_list.txt",
+                        help='The path to a newline delimited list of Chinese words or characters in Hanji')
+    parser.add_argument('--words-output-file', metavar='WORDS-OUTPUT-FILE', dest="words_output_file_name", type=str,
+                        required=False, default="word_list.txt",
                         help='By default this is word_list.txt. You may change it by providing this argument.')
+    parser.add_argument('--chars-output-file', metavar='CHARS-OUTPUT-FILE', dest="chars_output_file_name", type=str,
+                        required=False, default="chars_list.txt",
+                        help='By default this is chars_list.txt. You may change it by providing this argument.')
+    parser.add_argument('--chars-image-folder', metavar='CHARS-IMAGE-FOLDER', dest="chars_image_folder", type=str,
+                        required=False, default="char_images",
+                        help='By default creates a folder called char_images in the current directory to store the '
+                             'images associated with character images.')
     parser.add_argument('--skip-choices', dest="skip_choices", required=False, action='store_true',
                         help='This option will skip all choices and ignore the words for which a choice would have '
                              'been made.')
+    parser.add_argument('--ebook-path', metavar='EBOOK_PATH', dest="ebook_path", required=False, type=str,
+                        help='A path to Chinese Blockbuster in EPUB format. In my case, I bought all of them and merged'
+                             ' them into one big book.')
+    parser.add_argument('--log-level', metavar='LOG_LEVEL', dest="log_level", required=False, type=str, default="info",
+                        choices=['debug', 'info', 'warning', 'error', 'critical'],
+                        help='A path to Chinese Blockbuster in EPUB format. In my case, I bought all of them and merged'
+                             ' them into one big book.')
+    parser.add_argument('--use-media-folder', dest="use_media_folder", required=False, action='store_true',
+                        help='If this option is passed the program will try to write to Anki\'s media folder directly.'
+                             ' If you pass this argument, you must also pass your Anki username.')
+    parser.add_argument('--anki-username', metavar='ANKI_USERNAME', dest="anki_username", required=False, type=str,
+                        help='Your Anki username.')
     args = parser.parse_args()  # type: argparse.Namespace
 
-    output_words(args.output_file_name, get_words(args.input_file_name, args), args)
+    if args.use_media_folder:
+        if args.anki_username:
+            args.chars_image_folder = os.path.join(os.getenv("APPDATA"), "Anki2", args.anki_username,
+                                                   "collection.media")
+        else:
+            logging.critical("If you want to write directly to Anki's media folder you must provide your username!")
+            exit(1)
+
+    if args.log_level:
+        if args.log_level == "debug":
+            logging.basicConfig(level=logging.DEBUG)
+        elif args.log_level == "info":
+            logging.basicConfig(level=logging.INFO)
+        elif args.log_level == "warning":
+            logging.basicConfig(level=logging.WARNING)
+        elif args.log_level == "error":
+            logging.basicConfig(level=logging.ERROR)
+        elif args.log_level == "critical":
+            logging.basicConfig(level=logging.CRITICAL)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    words = get_words(args.input_file_name, args)
+    output_words(args.words_output_file_name, words[0])
+    output_characters(args.chars_output_file_name, args.chars_image_folder, words[1])
 
 
 if __name__ == '__main__':

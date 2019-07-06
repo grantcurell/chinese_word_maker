@@ -25,3 +25,9 @@ word_list
 tarjetaui/__pycache__/
 
 *.txt
+
+*.epub
+
+*.jpeg
+
+*.jpg
