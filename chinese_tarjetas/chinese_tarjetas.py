@@ -380,6 +380,7 @@ def process_char_entry(book, char):
                 # This means we already found the character previously, but have found another instance. In this case
                 # we note this in the dictionary by adding the key has_duplicates.
                 if found_char:
+                    organized_entries_list[-1]["has_duplicates"] = True
                     organized_entry["has_duplicates"] = True
 
                 # Search through the EPUB's images and find the one that is used on our page.
