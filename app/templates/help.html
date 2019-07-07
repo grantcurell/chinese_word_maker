@@ -1,0 +1,23 @@
+<!-- index.html-->
+
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block navbar %}
+{% include "navbar.html" %}
+{% endblock %}
+{% block body %}
+<div class="container card" id="topheader">
+<div class="jumbotron">
+  <h1 class="display-4">Help 幫!</h1>
+  <p class="lead">你帶很幫!</p>
+</div>
+{% for setting in form.kickstart_form_settings %}
+{% if setting.description is not none %}
+<dl class="row">
+  <dt class="col-sm-3">{{ setting.label }}<a name="{{ 'anchor_' + setting.label | replace(' ','_') }}"></a></dt>
+  <dd class="col-sm-9">{{ setting.description }}</dd>
+</dl>
+{% endif %}
+{% endfor %}
+</div>
+{% endblock %}

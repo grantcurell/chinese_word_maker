@@ -1,11 +1,3 @@
-__author__ = "Grant Curell"
-__copyright__ = "Do what you want with it"
-
-__license__ = "GPLv3"
-__version__ = "1.1.0"
-__maintainer__ = "Grant Curell"
-
-from argparse import ArgumentParser
 from urllib.request import urlopen
 from urllib.parse import quote
 from bs4 import BeautifulSoup
@@ -102,7 +94,7 @@ def output_characters(chars_output_file_name, char_images_folder, char_list):
             filename = str(int(datetime.now().timestamp())) + "-" + ntpath.basename(
                 character["image"].file_name).replace("jpeg", "jpg")  # type: str
             with open(os.path.join(char_images_folder, filename), "wb") as img_file:
-                img_file.write(character["image"].content)  # Output the image to disk
+                img_file.write(character["image_content"])  # Output the image to disk
 
             if "simplified" not in character:
                 character["simplified"] = ""
@@ -170,12 +162,13 @@ def output_characters(chars_output_file_name, char_images_folder, char_list):
                 logging.info("Writing the character: " + character["traditional"])
 
 
-def get_words(input_file_name, args):
+def get_words(input_file_name, ebook_path=None, skip_choices=False):
     """
     Reaches out to www.mdbg.net and grabs the data for each of the words on which you want data
 
     :param str input_file_name: The name of the file which contains the words we want to grab
-    :param argparse.Namespace args: Arguments passed on the command line
+    :param str ebook_path: Path to the ebook you want to read from
+    :param bool skip_choices: Whether you want to skip selection of the different characters
     :return: Returns a list of the words you want added to Anki with their corresponding data
     :rtype: list
     """
@@ -187,9 +180,8 @@ def get_words(input_file_name, args):
         pp = pprint.PrettyPrinter(indent=4)
         book = None
 
-        if args.ebook_path:
-            book = epub.read_epub(args.ebook_path)  # type: ebooklib.epub.EpubBook
-            images = book.get_items_of_media_type('image/jpeg')  # type: generator
+        if ebook_path:
+            book = epub.read_epub(ebook_path)  # type: ebooklib.epub.EpubBook
 
         for word in input_file.readlines():
 
@@ -200,7 +192,7 @@ def get_words(input_file_name, args):
                 # looking them up in the book Chinese Blockbuster and making flashcards. This will only be active if
                 # the ebook_path is provided on the command line.
                 if len(word) <= 2 and book is not None:
-                    new_char = process_char_entry(book, images, word)
+                    new_char = process_char_entry(book, word)
                     if new_char is not None:
                         new_chars.append(new_char)
                 else:
@@ -223,7 +215,7 @@ def get_words(input_file_name, args):
 
                         entries.append(process_word_entry(entry))
 
-                    if len(entries) > 1 and args.skip_choices is not True:
+                    if len(entries) > 1 and skip_choices is not True:
                         print( "It looks like there are multiple definitions for this word available. "
                                "Which one would you like to use?")
 
@@ -262,16 +254,14 @@ def get_words(input_file_name, args):
     return new_words, new_chars
 
 
-def process_char_entry(book, images, char):
+def process_char_entry(book, char):
     """
     Reads from an EPUB formatted version of the Chinese Blockbuster series
 
     :param EpubBook book: An open handle to the EPUB formatted book to use
-    :param generator images: A variable containing all the images listed in the ebook
     :param str char: The Character we want to process
-    :return: Returns a list of the characters you want added to Anki with their corresponding data. Returns none
-             if the character could not be found.
-    :rtype: list
+    :return: Returns a tuple. One with a list of the characters you looked for and the other with words
+    :rtype: dict - Returns a dictionary containing all the attributes of a character
     """
 
     logging.info("-------------------------------------")
@@ -368,6 +358,7 @@ def process_char_entry(book, images, char):
                 image_name = ntpath.basename(soup.find("img").attrs['src'])  # Grab the image name
 
                 organized_entry["image"] = book.get_item_with_href(top_level_dir + "/images/" + image_name)
+                organized_entry["image_content"] = organized_entry["image"].content
 
                 # Get the text for simplified components
                 content = soup.select_one(
@@ -448,66 +439,3 @@ def process_word_entry(entry):
         organized_entry.update({"hsk": ""})
 
     return organized_entry
-
-
-def main():
-
-    parser = ArgumentParser(description="Used to create Anki flash cards based on data from the website www.mdbg.net")
-    parser.add_argument('--file', metavar='FILE', dest="input_file_name", type=str, required=True,
-                        help='The path to a newline delimited list of Chinese words or characters in Hanji')
-    parser.add_argument('--words-output-file', metavar='WORDS-OUTPUT-FILE', dest="words_output_file_name", type=str,
-                        required=False, default="word_list.txt",
-                        help='By default this is word_list.txt. You may change it by providing this argument.')
-    parser.add_argument('--chars-output-file', metavar='CHARS-OUTPUT-FILE', dest="chars_output_file_name", type=str,
-                        required=False, default="chars_list.txt",
-                        help='By default this is chars_list.txt. You may change it by providing this argument.')
-    parser.add_argument('--chars-image-folder', metavar='CHARS-IMAGE-FOLDER', dest="chars_image_folder", type=str,
-                        required=False, default="char_images",
-                        help='By default creates a folder called char_images in the current directory to store the '
-                             'images associated with character images.')
-    parser.add_argument('--skip-choices', dest="skip_choices", required=False, action='store_true',
-                        help='This option will skip all choices and ignore the words for which a choice would have '
-                             'been made.')
-    parser.add_argument('--ebook-path', metavar='EBOOK_PATH', dest="ebook_path", required=False, type=str,
-                        help='A path to Chinese Blockbuster in EPUB format. In my case, I bought all of them and merged'
-                             ' them into one big book.')
-    parser.add_argument('--log-level', metavar='LOG_LEVEL', dest="log_level", required=False, type=str, default="info",
-                        choices=['debug', 'info', 'warning', 'error', 'critical'],
-                        help='A path to Chinese Blockbuster in EPUB format. In my case, I bought all of them and merged'
-                             ' them into one big book.')
-    parser.add_argument('--use-media-folder', dest="use_media_folder", required=False, action='store_true',
-                        help='If this option is passed the program will try to write to Anki\'s media folder directly.'
-                             ' If you pass this argument, you must also pass your Anki username.')
-    parser.add_argument('--anki-username', metavar='ANKI_USERNAME', dest="anki_username", required=False, type=str,
-                        help='Your Anki username.')
-    args = parser.parse_args()  # type: argparse.Namespace
-
-    if args.use_media_folder:
-        if args.anki_username:
-            args.chars_image_folder = os.path.join(os.getenv("APPDATA"), "Anki2", args.anki_username,
-                                                   "collection.media")
-        else:
-            logging.critical("If you want to write directly to Anki's media folder you must provide your username!")
-            exit(1)
-
-    if args.log_level:
-        if args.log_level == "debug":
-            logging.basicConfig(level=logging.DEBUG)
-        elif args.log_level == "info":
-            logging.basicConfig(level=logging.INFO)
-        elif args.log_level == "warning":
-            logging.basicConfig(level=logging.WARNING)
-        elif args.log_level == "error":
-            logging.basicConfig(level=logging.ERROR)
-        elif args.log_level == "critical":
-            logging.basicConfig(level=logging.CRITICAL)
-    else:
-        logging.basicConfig(level=logging.INFO)
-
-    words = get_words(args.input_file_name, args)
-    output_words(args.words_output_file_name, words[0])
-    output_characters(args.chars_output_file_name, args.chars_image_folder, words[1])
-
-
-if __name__ == '__main__':
-    main()

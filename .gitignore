@@ -31,3 +31,5 @@ tarjetaui/__pycache__/
 *.jpeg
 
 *.jpg
+
+*.pyc

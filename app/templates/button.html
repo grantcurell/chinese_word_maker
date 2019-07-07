@@ -1,0 +1,77 @@
+<!-- Object comes from the caller of this template and should be an instance of class
+     button in forms.py-->
+
+<script type="text/javascript">
+
+  //@ sourceURL=button_{{ object.button_id }}
+
+  $(document).ready(function(){
+
+    button_get_ids = function(){
+      get_ids();
+    }
+
+    // TODO: Need to figure out why this isn't behaving correctly.
+    //callbacks.add( button_get_ids );
+
+    // Server events: this function handles when a user presses submit on the
+    // number of servers button.
+    // See: https://api.jquery.com/click/
+    $('#{{ object.button_id }}').click(function (event) {
+
+      // Using [0] here because when you use $( "#form_servers" ) you get a jQuery
+      // selection set. To access the DOM properties you have to select the first
+      // item. checkValidity is an HTML5 built in function we are calling against
+      // the element.
+      if ($( "#{{ object.form_name }}" )[0].checkValidity() === false) {
+        event.preventDefault();
+        event.stopPropagation();
+      } else {
+      // This is inherited from the form. The reaction file is a file with
+      // javascript defining what should happen when the button is pressed.
+      // If this file is not defined, nothing happens.
+      {% if object.reaction_file is not none %}
+        {% include object.reaction_file %}
+      {%endif %}
+      }
+      $( "#{{ object.form_name }}" ).addClass('was-validated');
+
+    });
+
+    // This function is only here so that validity appears as soon as they start
+    // typing. It is effectively identical to the above except that it does not
+    // include a reaction if the input is valid
+    $('#{{ object.field_id }}').keyup(function (event) {
+      // Using [0] here because when you use $( "#form_servers" ) you get a jQuery
+      // selection set. To access the DOM properties you have to select the first
+      // item. checkValidity is an HTML5 built in function we are calling against
+      // the element.
+      if ($( "#{{ object.form_name }}" )[0].checkValidity() === false) {
+        event.preventDefault();
+        event.stopPropagation();
+      } else {
+        // TODO: Need to figure out why this isn't behaving correctly.
+        //set_id_value("{{ object.field_id }}", $( "#{{ object.field_id }}").val());
+      }
+      $( "#{{ object.form_name }}" ).addClass('was-validated');
+    });
+});
+</script>
+
+<form id='{{ object.form_name }}' role=form class="needs-validation" novalidate>
+<div class="input-group mb-3">
+  <div class="input-group-prepend">
+    <span class="input-group-text">{{ object.label }}</span>
+  </div>
+  <input name="{{ object.field_id }}" id="{{ object.field_id }}" type="{{ object.input_type | default("text", true) }}" {{ object.html5_constraint }} class="form-control" placeholder="{{ object.placeholder }}" {{ 'required' if object.required is not none }}>
+  <div class="input-group-append">
+    <button class="btn btn-primary" id="{{ object.button_id }}" type="button">{{ object.button_text }}</button>
+  </div>
+  <div class="valid-feedback">
+  {{ object.valid_feedback | default("Looks good!", true) }}
+  </div>
+  <div class="invalid-feedback">
+  {{ object.invalid_feedback | default("This field is required", true) }}
+  </div>
+</div>
+</form>

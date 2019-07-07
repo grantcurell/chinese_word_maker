@@ -1,0 +1,32 @@
+---
+
+pip install virtualenv virtualenvwrapper
+pip install --upgrade pip
+export WORKON_HOME=~/Envs
+source /usr/bin/virtualenvwrapper.sh
+mkvirtualenv my-venv
+workon my-venv
+pip install Flask
+export FLASK_ENV=development
+flask run --host=0.0.0.0
+
+...
+
+
+- Need to add a check to make sure they didn't mean to exclude a drive
+- Need to make sure they have selected a master server
+- Need to give Elasticsearch a data minimum
+- Need to add a CPU / Memory check for sensor
+
+----------------------------
+
+yum install -y python2-pip
+pip install flask virtualenv virtualenvwrapper
+pip install --upgrade pip
+export WORKON_HOME=~/Envs
+source /usr/bin/virtualenvwrapper.sh
+mkvirtualenv my-venv
+workon my-venv
+
+For development mode run: export FLASK_ENV=development
+flask run --host=0.0.0.0
