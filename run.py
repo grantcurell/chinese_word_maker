@@ -2,7 +2,7 @@ __author__ = "Grant Curell"
 __copyright__ = "Do what you want with it"
 
 __license__ = "GPLv3"
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 __maintainer__ = "Grant Curell"
 
 from app import app
