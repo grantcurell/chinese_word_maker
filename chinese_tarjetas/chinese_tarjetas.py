@@ -194,7 +194,11 @@ def get_words(input_file_name, ebook_path=None, skip_choices=False):
                 if len(word) <= 2 and book is not None:
                     new_char = process_char_entry(book, word)
                     if new_char is not None:
-                        new_chars.append(new_char)
+                        if len(new_char > 1):
+                            for character in new_char:
+                                new_chars.append(character)
+                        else:
+                            new_chars.append(new_char[0])
                 else:
 
                     logging.info("Requested word is: " + word)
@@ -260,8 +264,9 @@ def process_char_entry(book, char):
 
     :param EpubBook book: An open handle to the EPUB formatted book to use
     :param str char: The Character we want to process
-    :return: Returns a tuple. One with a list of the characters you looked for and the other with words
-    :rtype: dict - Returns a dictionary containing all the attributes of a character
+    :return: Returns a list of organized entries dictionaries. Most of the time there will be only one, but sometimes
+             the book has multiple entries for a single character.
+    :rtype: list of dict - Returns a dictionary containing all the attributes of a character
     """
 
     logging.info("-------------------------------------")
@@ -270,14 +275,22 @@ def process_char_entry(book, char):
     # Used to track whether we found the character
     found_char = False
 
-    organized_entry = {}  # type: dict
+    # In some cases there are multiple variants of a single word. This variable is used to control searching for those.
+    continued = False  # type: bool
 
-    # continued = False  # type: bool
+    # This is a list of organized entries. It is only used if the program finds more than one instance of a symbol match
+    organized_entries_list = []
+
+    loop_counter = 0
 
     for doc in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
 
+        loop_counter += 1
+
         content = doc.content.decode('utf-8')
         logging.debug(content)
+
+        organized_entry = {}  # type: dict
 
         # This may seem redundant with the following conditional statement, but I figured it would be faster to do
         # a quick character search in place of parsing everything into Beautiful Soup for every run of the loop
@@ -303,7 +316,12 @@ def process_char_entry(book, char):
 
             if character_header is not None:
 
-                found_char = True
+                # If this results to true, it means that we found the character once, are continuing the loop, but
+                # now have found it a second time. This means that there were two pages in the book with the same
+                # character.
+                if continued:
+                    continued = False
+
                 logging.info("Found character " + char + " in the book!")
 
                 character_header = character_header.text.split('[')
@@ -351,12 +369,18 @@ def process_char_entry(book, char):
                         organized_entry["mnemonics"] = content
                     elif text == "SOUND WORD":
                         organized_entry["soundword"] = content
+                        organized_entry["soundword_text"] = content_text.replace('\n', '   ')
                     elif text == "STORY":
                         organized_entry["story"] = content
                     elif text == "EXAMPLES":
                         organized_entry["examples"] = content
                     elif text == "WANT A LITTLE MORE?":
                         organized_entry["additionalinfo"] = content
+
+                # This means we already found the character previously, but have found another instance. In this case
+                # we note this in the dictionary by adding the key has_duplicates.
+                if found_char:
+                    organized_entry["has_duplicates"] = True
 
                 # Search through the EPUB's images and find the one that is used on our page.
                 image_name = ntpath.basename(soup.find("img").attrs['src'])  # Grab the image name
@@ -417,21 +441,28 @@ def process_char_entry(book, char):
 
                 logging.debug("MATCH FOUND")
 
-            # TODO Need to extend this to handle the situation that there are multiple duplicate characters
-            """
-            if continued:
-                break
-            else:
-                continued = True
-                continue
-            """
+                found_char = True
+
+                if continued:
+                    break
+                else:
+                    continued = True
+                    organized_entries_list.append(organized_entry)
+                    continue
+
+        # This means that the loop ran again because we found a duplicate character, but this time around the page
+        # didn't have a duplicate so we can break.
+        elif continued:
+            break
+
+    logging.debug("Took " + str(loop_counter) + " loops to find the character.")
 
     if not found_char:
         logging.warning("Did not find character " + char + " in the book!")
         return None
 
     logging.info("Found all of character " + char + "'s information")
-    return organized_entry
+    return organized_entries_list
 
 
 def process_word_entry(entry):

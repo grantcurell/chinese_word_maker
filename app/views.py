@@ -8,25 +8,34 @@ from ntpath import basename
 @app.route('/_lookup_character')
 def _lookup_character():
 
+    # This is used to store multiple templates. This is only used when we find multiple character entries.
+    webpage = ""
+
     character = request.args.get('character_to_lookup').strip()
 
     character_results = process_char_entry(app.config["ebook"], character)
 
     if character_results:
-        image_path = "static/" + basename(character_results["image"].file_name)
+        for organized_entry in character_results:
+            image_path = "static/" + basename(organized_entry["image"].file_name)
 
-        with open(path.join("app", "static", basename(character_results["image"].file_name)), "wb") as img_file:
-            img_file.write(character_results["image_content"])  # Output the image to disk
+            with open(path.join("app", "static", basename(organized_entry["image"].file_name)), "wb") as img_file:
+                img_file.write(organized_entry["image_content"])  # Output the image to disk
 
-        # TODO: The addition of the definition here is just acting as a poor man's recent searches. I should include
-        # TODO: this in the website.
-        if not character in open("character_searches.txt", "r", encoding="utf-8-sig").read():
-            with open("character_searches.txt", "a+", encoding="utf-8-sig") as character_searches:
-                character_searches.write(character + " \\ " + character_results["pinyin_text"] + " \\ " +
-                                         character_results["defs_text"] + "\n")
+            # TODO: The addition of the definition here is just acting as a poor man's recent searches. I should include
+            # TODO: this in the website.
+            if not character in open("character_searches.txt", "r", encoding="utf-8-sig").read():
+                with open("character_searches.txt", "a+", encoding="utf-8-sig") as character_searches:
+                    character_searches.write(
+                        character + " \\ " + organized_entry["soundword_text"] + " \\ " +
+                        organized_entry["pinyin_text"] + " \\ " + organized_entry["defs_text"] + "\n")
 
-        return render_template('character.html', title='Configure Inventory', image_path=image_path,
-                               results=character_results)
+            webpage += render_template('character.html', title='Configure Inventory', image_path=image_path,
+                                       results=organized_entry) + "<hr>" \
+                                                                  "" \
+
+        return webpage
+
     else:
         return 'We could not find that character in the book!'
 
