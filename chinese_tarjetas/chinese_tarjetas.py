@@ -326,6 +326,7 @@ def process_char_entry(book, char):
                 for heading in soup.findAll("p", {"class": "p_cat_heading"}):
 
                     content = ""  # type: str
+                    content_text = ""  # type: str
 
                     for temp_heading in heading.find_next_siblings():
                         # The below stops as soon as we reach the next instance of p_cat_heading or we reach an element
@@ -336,13 +337,16 @@ def process_char_entry(book, char):
                         else:
                             logging.debug(str(temp_heading))
                             content += str(temp_heading)
+                            content_text = temp_heading.text
 
                     text = heading.text.strip()  # type: str
 
                     if text == "DEFINITION":
                         organized_entry["defs"] = content
+                        organized_entry["defs_text"] = content_text.replace('\n', '   ')
                     elif text == "PRONUNCIATION":
                         organized_entry["pinyin"] = content
+                        organized_entry["pinyin_text"] = content_text.replace('\n', '   ')
                     elif text == "MNEMONICS":
                         organized_entry["mnemonics"] = content
                     elif text == "SOUND WORD":
@@ -383,6 +387,33 @@ def process_char_entry(book, char):
                         organized_entry["traditionalcomponents"] = str(content.find_next())
                     else:
                         logging.info("No components found for character " + char + ".")
+
+                # I noticed some elements didn't strictly adhere to having header information. This is an exception
+                # I wrote specifically for definitions.
+                if "defs" not in organized_entry:
+                    paragraghs = soup.find_all('p')
+
+                    for p in paragraghs:
+                        if p.find(text="DEFINITION"):
+
+                            organized_entry["defs"] = ""
+                            organized_entry["defs_text"] = ""
+
+                            for temp_heading in p.find_next_siblings():
+                                # The below stops as soon as we reach the next instance of p_cat_heading or we reach an
+                                # element with an image as a child which we also don't want to capture
+                                if "p_cat_heading" in temp_heading.attrs["class"][0] \
+                                        or "img" in str(list(temp_heading.descendants)):
+                                    break
+                                else:
+                                    logging.debug(str(temp_heading))
+                                    organized_entry["defs"] += str(temp_heading)
+                                    organized_entry["defs_text"] += temp_heading.text.replace('\n', '   ') + " "
+
+                            break
+
+                    if "defs" not in organized_entry:
+                        logging.warning("We were unable to find a definition for this word. That's pretty weird.")
 
                 logging.debug("MATCH FOUND")
 

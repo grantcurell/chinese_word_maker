@@ -19,6 +19,13 @@ $(document).ready(function(){
         input_data[id] = value;
     }
 
+    $("#{{ form.character.field_id }}").on("keypress", function(event) {
+        if (event.keyCode === 13) {
+            $("#{{ form.character.button_id }}").click();
+            return false;
+        }
+    });
+
 });
 
 </script>
