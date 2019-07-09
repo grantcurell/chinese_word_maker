@@ -115,9 +115,13 @@ def output_characters(chars_output_file_name, char_images_folder, char_list):
 
             character_cleaned = {}
 
+            logging.debug("Replacing new lines with HTML line breaks.")
+
             # Replace any newlines in the text with HTML line breaks
             for key, value in character.items():
-                if key != "image":  # The image value has no replace capability so we have to skip it
+
+                # The image value has no replace capability so we have to skip it
+                if key != "image" and key != "image_content" and key != "has_duplicates":
                     character_cleaned[key] = value.replace("\n", "<br>")
 
             delimiter = '\\'
@@ -177,7 +181,6 @@ def get_words(input_file_name, ebook_path=None, skip_choices=False):
 
         new_words = []  # type: list
         new_chars = []  # type: list
-        pp = pprint.PrettyPrinter(indent=4)
         book = None
 
         if ebook_path:
@@ -194,53 +197,16 @@ def get_words(input_file_name, ebook_path=None, skip_choices=False):
                 if len(word) <= 2 and book is not None:
                     new_char = process_char_entry(book, word)
                     if new_char is not None:
-                        if len(new_char > 1):
+                        if len(new_char) > 1:
                             for character in new_char:
                                 new_chars.append(character)
                         else:
                             new_chars.append(new_char[0])
                 else:
+                    new_word = process_word(word)
+                    if new_word:
+                        new_words.append()
 
-                    logging.info("Requested word is: " + word)
-                    logging.info("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word)
-
-                    url_string = "https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" \
-                                 + quote(word)  # type: str
-
-                    html = urlopen(url_string).read().decode('utf-8')  # type: str
-
-                    soup = BeautifulSoup(html, 'html.parser')  # type: bs4.BeautifulSoup
-
-                    results = soup.find_all("tr", {"class": "row"})  # type: bs4.element.ResultSet
-
-                    entries = []  # type: list
-
-                    for entry in results:
-
-                        entries.append(process_word_entry(entry))
-
-                    if len(entries) > 1 and skip_choices is not True:
-                        print( "It looks like there are multiple definitions for this word available. "
-                               "Which one would you like to use?")
-
-                        print("\n\n-------- Option 0 ---------\n\n")
-                        print("Type 0 to skip.")
-
-                        for index, entry in enumerate(entries):
-                            print("\n\n-------- Option " + str(index+1) + "---------\n\n")
-                            pp.pprint(entry)
-
-                        print("\n\n")
-                        selection = -1  # type: int
-
-                        while (selection > len(entries) or selection < 1) and selection != 0:
-                            selection = int(input("Enter your selection: "))
-
-                        if selection != 0:
-                            new_words.append(entries[selection-1])
-
-                    elif len(entries) == 1:
-                        new_words.append(entries[0])
             except KeyboardInterrupt:
                 if not query_yes_no("You have pressed ctrl+C. Are you sure you want to exit?"):
                     exit(0)
@@ -256,6 +222,99 @@ def get_words(input_file_name, ebook_path=None, skip_choices=False):
                     exit(1)
 
     return new_words, new_chars
+
+
+def process_word_entry(entry):
+    """
+    Processes a single row from www.mbdg.net and returns it in a dictionary
+
+    :param bs4.element.Tag entry: This is equivalent to one row in the results from www.mdbg.net
+    :return: Returns a list of dictionary items containing each of the possible results
+    :rtype: list of dicts
+    """
+
+    organized_entry = {}  # type: dict
+
+    organized_entry.update({"traditional": entry.find("td", {"class": "head"}).find("div", {"class": "hanzi"}).text})
+
+    # I didn't investigate why, but for some reason the site was adding u200b so I just manually stripped that
+    # whitespace out.
+    organized_entry.update({"pinyin": str(entry.find("div", {"class": "pinyin"}).text).strip().replace(u'\u200b', "")})
+
+    # The entries come separated by /'s which is why we have the split here
+    # The map function here just gets rid of the extra whitespace on each word before assignment
+    organized_entry.update({"defs": list(map(str.strip, str(entry.find("div", {"class": "defs"}).text).split('/')))})
+
+    tail = entry.find("td", {"class": "tail"})
+    simplified = tail.find("div", {"class": "hanzi"})  # type: bs4.element.Tag
+    hsk = tail.find("div", {"class": "hsk"})  # type: bs4.element.Tag
+
+    if simplified is not None:
+        organized_entry.update({"simplified": simplified.text})
+    else:
+        organized_entry.update({"simplified": ""})
+
+    if hsk is not None:
+        organized_entry.update({"hsk": hsk.text})
+    else:
+        organized_entry.update({"hsk": ""})
+
+    return organized_entry
+
+
+def process_word(word, skip_choices):
+    """
+    Processes a word in the list of words
+
+    :param str word: The word from the list
+    :param skip_choices: Whether we should skip prompting the user if there are multiple choices or not
+    :return: TODO NEEED TO ADD THIS
+    :rtype: TODO NEED TO ADD THIS
+    """
+
+    pp = pprint.PrettyPrinter(indent=4)
+
+    logging.info("Requested word is: " + word)
+    logging.info("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word)
+
+    url_string = "https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" \
+                 + quote(word)  # type: str
+
+    html = urlopen(url_string).read().decode('utf-8')  # type: str
+
+    soup = BeautifulSoup(html, 'html.parser')  # type: bs4.BeautifulSoup
+
+    results = soup.find_all("tr", {"class": "row"})  # type: bs4.element.ResultSet
+
+    entries = []  # type: list
+
+    for entry in results:
+        entries.append(process_word_entry(entry))
+
+    if len(entries) > 1 and skip_choices is not True:
+        print("It looks like there are multiple definitions for this word available. "
+              "Which one would you like to use?")
+
+        print("\n\n-------- Option 0 ---------\n\n")
+        print("Type 0 to skip.")
+
+        for index, entry in enumerate(entries):
+            print("\n\n-------- Option " + str(index + 1) + "---------\n\n")
+            pp.pprint(entry)
+
+        print("\n\n")
+        selection = -1  # type: int
+
+        while (selection > len(entries) or selection < 1) and selection != 0:
+            selection = int(input("Enter your selection: "))
+
+        if selection != 0:
+            return entries[selection - 1]
+        else:
+            return None
+
+    elif len(entries) == 1:
+        return entries[0]
 
 
 def process_char_entry(book, char):
@@ -288,7 +347,7 @@ def process_char_entry(book, char):
         loop_counter += 1
 
         content = doc.content.decode('utf-8')
-        logging.debug(content)
+        #logging.debug(content)
 
         organized_entry = {}  # type: dict
 
@@ -464,41 +523,3 @@ def process_char_entry(book, char):
 
     logging.info("Found all of character " + char + "'s information")
     return organized_entries_list
-
-
-def process_word_entry(entry):
-    """
-    Processes a single row from www.mbdg.net and returns it in a dictionary
-
-    :param bs4.element.Tag entry: This is equivalent to one row in the results from www.mdbg.net
-    :return: Returns a list of dictionary items containing each of the possible results
-    :rtype: list of dicts
-    """
-
-    organized_entry = {}  # type: dict
-
-    organized_entry.update({"traditional": entry.find("td", {"class": "head"}).find("div", {"class": "hanzi"}).text})
-
-    # I didn't investigate why, but for some reason the site was adding u200b so I just manually stripped that
-    # whitespace out.
-    organized_entry.update({"pinyin": str(entry.find("div", {"class": "pinyin"}).text).strip().replace(u'\u200b', "")})
-
-    # The entries come separated by /'s which is why we have the split here
-    # The map function here just gets rid of the extra whitespace on each word before assignment
-    organized_entry.update({"defs": list(map(str.strip, str(entry.find("div", {"class": "defs"}).text).split('/')))})
-
-    tail = entry.find("td", {"class": "tail"})
-    simplified = tail.find("div", {"class": "hanzi"})  # type: bs4.element.Tag
-    hsk = tail.find("div", {"class": "hsk"})  # type: bs4.element.Tag
-
-    if simplified is not None:
-        organized_entry.update({"simplified": simplified.text})
-    else:
-        organized_entry.update({"simplified": ""})
-
-    if hsk is not None:
-        organized_entry.update({"hsk": hsk.text})
-    else:
-        organized_entry.update({"hsk": ""})
-
-    return organized_entry

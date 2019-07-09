@@ -3773,8 +3773,8 @@
     }
 .p_chinese_char {
     display: block;
-    font-family: KaiTi;
-    font-size: 2em;
+    font-family: Kaiti;
+    font-size: 60px;
     letter-spacing: -1mm;
     line-height: 1.2;
     page-break-after: avoid;

@@ -21,10 +21,12 @@ def _lookup_character():
     if character_results:
 
         for organized_entry in character_results:
-            image_path = "static/" + basename(organized_entry["image"].file_name)
 
-            with open(path.join("app", "static", basename(organized_entry["image"].file_name)), "wb") as img_file:
-                img_file.write(organized_entry["image_content"])  # Output the image to disk
+            if "image" in organized_entry:
+                image_path = "static/" + basename(organized_entry["image"].file_name)
+
+                with open(path.join("app", "static", basename(organized_entry["image"].file_name)), "wb") as img_file:
+                    img_file.write(organized_entry["image_content"])  # Output the image to disk
 
             # TODO: The addition of the definition here is just acting as a poor man's recent searches. I should include
             # TODO: this in the website.
@@ -32,9 +34,10 @@ def _lookup_character():
                 with open("character_searches.txt", "a+", encoding="utf-8-sig") as character_searches:
                     if "has_duplicates" in organized_entry:
                         has_duplicates = True
+
                     character_searches.write(
-                        character + " \\ " + organized_entry["soundword_text"] + " \\ " +
-                        organized_entry["pinyin_text"] + " \\ " + organized_entry["defs_text"] + "\n")
+                        character + " \\ " + organized_entry["pinyin_text"] + " \\ " +
+                        organized_entry["soundword_text"] + " \\ " + organized_entry["defs_text"] + "\n")
 
             webpage += render_template('character.html', title='Configure Inventory', image_path=image_path,
                                        results=organized_entry) + "<hr>" \

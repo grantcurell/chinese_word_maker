@@ -55,7 +55,7 @@ def main():
                                                    "collection.media")
         else:
             logging.critical("If you want to write directly to Anki's media folder you must provide your username!")
-            exit(1)
+            exit(0)
 
     if args.log_level:
         if args.log_level == "debug":
@@ -72,15 +72,16 @@ def main():
     else:
         logging.basicConfig(level=logging.INFO)
 
+    if args.ebook_path and Path(args.ebook_path).is_file():
+        app.config["ebook"] = epub.read_epub(args.ebook_path)
+    else:
+        print(args.ebook_path + " is not a file or that path doesn't exist!")
+        exit(0)
+
     if args.run_server:
         if args.ebook_path:
-            if Path(args.ebook_path).is_file():
-                app.config["ebook"] = epub.read_epub(args.ebook_path)
-                app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-                app.run(host='0.0.0.0', port=args.port)
-            else:
-                print(args.ebook_path + " is not a file or doesn't exist!")
-                exit(0)
+            app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+            app.run(host='0.0.0.0', port=args.port)
         else:
             print("You cannot start a server without providing a path of a character ebook!")
             exit(0)
