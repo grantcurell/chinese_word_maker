@@ -91,9 +91,10 @@ def _lookup_character():
                 with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
                     if "simplified" in word[0]:
                         word_file.write(
-                            word[0]["traditional"] + " / " + word[0]["simplified"] + " / " + ",".join(word[0]["defs"]))
+                            word[0]["traditional"] + " / " + word[0]["simplified"] + " / " + ",".join(word[0]["defs"]) +
+                            "\n")
                     else:
-                        word_file.write(word[0]["traditional"] + " / " + ",".join(word[0]["defs"]))
+                        word_file.write(word[0]["traditional"] + " / " + ",".join(word[0]["defs"]) + "\n")
 
         return webpage
 

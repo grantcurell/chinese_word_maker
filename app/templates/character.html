@@ -4108,10 +4108,16 @@
     {{ results.soundword | safe }}
     <br>
     <img src="{{ image_path }}" />
+    {% if 'simplifiedcomponents' in results %}
     <p class="p_cat_heading__and__centre_alignment">SIMPLIFIED COMPONENTS</p>
+     <div style="text-align:center;">
     {{ results.simplifiedcomponents | safe }}
+     </div>
+    {% endif %}
     <p class="p_cat_heading__and__centre_alignment">TRADITIONAL COMPONENTS</p>
+     <div style="text-align:center;">
     {{ results.traditionalcomponents | safe }}
+     </div>
     <p class="p_cat_heading">STORY</p>
     {{ results.story | safe }}
     <p class="p_cat_heading">EXAMPLES</p>
