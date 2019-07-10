@@ -48,6 +48,9 @@ def main():
                              'for characters. This will supersede all other arguments.')
     parser.add_argument('--port', dest="port", required=False, type=int, default=5000,
                         help='Specify the port you want Flask to run on')
+    parser.add_argument('--create-combined', dest="combined_output", required=False, action='store_true',
+                        help='Set this option if you want to create flashcards with combined character mnemonics and'
+                             ' words in a single output.')
     args = parser.parse_args()  # type: argparse.Namespace
 
     if args.use_media_folder:
@@ -75,7 +78,7 @@ def main():
 
     if args.ebook_path and Path(args.ebook_path).is_file():
         app.config["ebook"] = epub.read_epub(args.ebook_path)
-    else:
+    elif args.ebook_path:
         print(args.ebook_path + " is not a file or that path doesn't exist!")
         exit(0)
 
@@ -89,13 +92,18 @@ def main():
     else:
         if args.input_file_name:
             if Path(args.input_file_name).is_file():
-                words = ()
-                with open(args.input_file, encoding="utf-8-sig") as input_file:
+                words = []
+                with open(args.input_file_name, encoding="utf-8-sig") as input_file:
                     for word in input_file.readlines():
                         words.append(word)
-                words = get_words(args.input_file_name, app.config["ebook"], args.skip_choices)
-                output_words(args.words_output_file_name, words[0])
-                output_characters(args.chars_output_file_name, args.chars_image_folder, words[1])
+
+                words, characters = get_words(words, app.config["ebook"], args.skip_choices)
+
+                if args.combined_output:
+                    output_combined(args.words_output_file_name, args.chars_image_folder, words)
+                else:
+                    output_words(args.words_output_file_name, words)
+                    output_characters(args.chars_output_file_name, args.chars_image_folder, characters)
             else:
                 print(args.input_file_name + " is not a file or doesn't exist!")
                 exit(0)

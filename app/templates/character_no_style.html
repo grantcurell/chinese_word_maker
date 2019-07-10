@@ -1,0 +1,27 @@
+ <div>
+    <p class="p_chinese_char">{{ results.traditional | safe  }}{{ results.simplified | safe  }}</p>
+    <p class="p_cat_heading">DEFINITION</p>
+    {{ results.defs | safe }}
+    <p class="p_cat_heading">PRONUNCIATION </p>
+    {{ results.pinyin | safe }}
+    <p class="p_cat_heading">SOUND WORD</p>
+    {{ results.soundword | safe }}
+    <br>
+    <img src="{{ image_path }}" />
+    {% if 'simplifiedcomponents' in results %}
+    <p class="p_cat_heading__and__centre_alignment">SIMPLIFIED COMPONENTS</p>
+     <div style="text-align:center;">
+    {{ results.simplifiedcomponents | safe }}
+     </div>
+    {% endif %}
+    <p class="p_cat_heading__and__centre_alignment">TRADITIONAL COMPONENTS</p>
+     <div style="text-align:center;">
+    {{ results.traditionalcomponents | safe }}
+     </div>
+    <p class="p_cat_heading">STORY</p>
+    {{ results.story | safe }}
+    <p class="p_cat_heading">EXAMPLES</p>
+    {{ results.examples | safe }}
+    <p class="p_cat_heading">WANT A LITTLE MORE?</p>
+    {{ results.additionalinfo | safe }}
+ </div>

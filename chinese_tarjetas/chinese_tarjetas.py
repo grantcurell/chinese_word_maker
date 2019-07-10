@@ -10,6 +10,72 @@ import ntpath
 import sys
 import re
 from datetime import datetime
+import jinja2
+from ntpath import basename
+from os import path
+
+
+def get_chars_html(characters, image_location=path.join("app", "static")):
+    """
+    Grabs the HTML for each of the characters in a list of characters
+
+    :param characters: A list ofg the characters you want to grab
+    :param image_location Used to optionally control where the image is written to
+    :return: Returns a webpgae with all the character data rendered
+    :rtype: str
+    """
+
+    webpage = ""
+
+    # Used to print out multiple characters in the event there are duplicates
+    has_duplicates = False
+
+    image_path = ""
+
+    for organized_entry in characters:
+
+        if "image" in organized_entry:
+            if image_location == path.join("app", "static"):
+                image_path = "static/" + basename(organized_entry["image"].file_name)
+            else:
+                image_path = image_location
+
+            with open(path.join(image_location, basename(organized_entry["image"].file_name)), "wb") as img_file:
+                img_file.write(organized_entry["image_content"])  # Output the image to disk
+
+        if not path.exists('character_searches.txt'):
+            with open('character_searches.txt', 'w'): pass
+
+        with open("character_searches.txt", "r", encoding="utf-8-sig") as file:
+            characters_file_contents = file.read()
+
+            print(characters_file_contents)
+
+            if (organized_entry["traditional"] not in characters_file_contents and
+                    ("simplified" in organized_entry and organized_entry["simplified"] not in characters_file_contents))\
+                    or ("simplified" not in organized_entry and organized_entry["traditional"] not in characters_file_contents)\
+                    or has_duplicates:
+
+                with open("character_searches.txt", "a+", encoding="utf-8-sig") as character_searches:
+                    if "has_duplicates" in organized_entry:
+                        has_duplicates = True
+
+                    if "simplified" in organized_entry:
+                        character_searches.write(
+                            organized_entry["traditional"] + "/" + organized_entry["simplified"] + " \\ " +
+                            organized_entry["pinyin_text"] + " \\ " + organized_entry["soundword_text"] +
+                            " \\ " + organized_entry["defs_text"] + "\n")
+                    else:
+                        character_searches.write(
+                            organized_entry["traditional"] + " \\ " + organized_entry["pinyin_text"] + " \\ " +
+                            organized_entry["soundword_text"] + " \\ " + organized_entry["defs_text"] + "\n")
+
+            env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
+            template = env.get_template("character_no_style.html")
+
+            webpage += template.render(image_path=image_path, results=organized_entry) + "<hr>"
+
+    return webpage
 
 
 def query_yes_no(question, default="yes"):
@@ -44,6 +110,19 @@ def query_yes_no(question, default="yes"):
                              "(or 'y' or 'n').\n")
 
 
+def _get_word_line(word, delimiter):
+    """
+    Gets the string used for outputting words
+
+    :param word: The word you want to output
+    :param delimiter: The delimiter you want to use in the output
+    :return: String used for outputting to an Anki flashcard for words
+    :rtype: str
+    """
+
+    return word["traditional"] + delimiter + word["simplified"] + delimiter + word["pinyin"] + delimiter + \
+           "<br>".join(word["defs"]).replace(delimiter, "") + delimiter + word["hsk"].replace(" ", "")
+
 def output_words(words_output_file_name, word_list):
     """
     Outputs the new words to a file for import into Anki
@@ -60,11 +139,65 @@ def output_words(words_output_file_name, word_list):
         for word in word_list:
 
             # You need the <br/>s in anki for newlines. The strip makes sure there isn't one randomly trailing
-            output_file.write(word["traditional"] + "," + word["simplified"] + "," + word["pinyin"] + "," +
-                              "<br>".join(word["defs"]).replace(",", "") + "," + word["hsk"].replace(" ", "") + "\n")
+            output_file.write(_get_word_line(word, ",") + "\n")
 
-            logging.info("Writing: " + word["traditional"] + "," + word["simplified"] + "," + word["pinyin"] + "," +
-                         "<br>".join(word["defs"]) + "," + word["hsk"])
+            logging.info("Writing: " + _get_word_line(word))
+
+
+def _get_character_line(character, image_file_name, delimiter):
+    """
+    Gets the line to be output for a single character
+
+    :param character: The character we want to output
+    :param image_file_name: The image file name for the character in question
+    :param delimiter: The delimiter you want to use in the output
+    :return: Returns the HTML string for the character
+    :rtype: str
+    """
+
+    if "simplified" not in character:
+        character["simplified"] = ""
+    if "defs" not in character:
+        character["defs"] = ""
+    if "mnemonics" not in character:
+        character["mnemonics"] = ""
+    if "story" not in character:
+        character["story"] = ""
+    if "examples" not in character:
+        character["examples"] = ""
+    if "additionalinfo" not in character:
+        character["additionalinfo"] = ""
+    if "simplifiedcomponents" not in character:
+        character["simplifiedcomponents"] = ""
+    if "traditionalcomponents" not in character:
+        character["traditionalcomponents"] = ""
+
+    character_cleaned = {}
+
+    logging.debug("Replacing new lines with HTML line breaks.")
+
+    # Replace any newlines in the text with HTML line breaks
+    for key, value in character.items():
+
+        # The image value has no replace capability so we have to skip it
+        if key != "image" and key != "image_content" and key != "has_duplicates":
+            character_cleaned[key] = value.replace("\n", "<br>")
+
+    # The only if conditions ensure that if a field is missing because it isn't part of a page that an error
+    # isn't thrown.
+    return  \
+        character_cleaned["traditional"] + delimiter + \
+        character_cleaned["simplified"] + delimiter + \
+        character_cleaned["defs"] + delimiter + \
+        character_cleaned["pinyin"] + delimiter + \
+        character_cleaned["soundword"] + delimiter + \
+        "<img src=\"" + image_file_name + "\" />" + delimiter + \
+        character_cleaned["mnemonics"] + delimiter + \
+        character_cleaned["story"] + delimiter + \
+        character_cleaned["examples"] + delimiter + \
+        character_cleaned["additionalinfo"] + delimiter + \
+        character_cleaned["simplifiedcomponents"] + delimiter + \
+        character_cleaned["traditionalcomponents"]
 
 
 def output_characters(chars_output_file_name, char_images_folder, char_list):
@@ -95,74 +228,26 @@ def output_characters(chars_output_file_name, char_images_folder, char_list):
             with open(os.path.join(char_images_folder, filename), "wb") as img_file:
                 img_file.write(character["image_content"])  # Output the image to disk
 
-            if "simplified" not in character:
-                character["simplified"] = ""
-            if "defs" not in character:
-                character["defs"] = ""
-            if "mnemonics" not in character:
-                character["mnemonics"] = ""
-            if "story" not in character:
-                character["story"] = ""
-            if "examples" not in character:
-                character["examples"] = ""
-            if "additionalinfo" not in character:
-                character["additionalinfo"] = ""
-            if "simplifiedcomponents" not in character:
-                character["simplifiedcomponents"] = ""
-            if "traditionalcomponents" not in character:
-                character["traditionalcomponents"] = ""
+            character_line = _get_character_line(character, filename, "\\")
 
-            character_cleaned = {}
-
-            logging.debug("Replacing new lines with HTML line breaks.")
-
-            # Replace any newlines in the text with HTML line breaks
-            for key, value in character.items():
-
-                # The image value has no replace capability so we have to skip it
-                if key != "image" and key != "image_content" and key != "has_duplicates":
-                    character_cleaned[key] = value.replace("\n", "<br>")
-
-            delimiter = '\\'
-
-            # The only if conditions ensure that if a field is missing because it isn't part of a page that an error
-            # isn't thrown.
-            output_file.write(
-                character_cleaned["traditional"] + delimiter +
-                character_cleaned["simplified"] + delimiter +
-                character_cleaned["defs"] + delimiter +
-                character_cleaned["pinyin"] + delimiter +
-                character_cleaned["soundword"] + delimiter +
-                "<img src=\"" + filename + "\" />" + delimiter +
-                character_cleaned["mnemonics"] + delimiter +
-                character_cleaned["story"] + delimiter +
-                character_cleaned["examples"] + delimiter +
-                character_cleaned["additionalinfo"] + delimiter +
-                character_cleaned["simplifiedcomponents"] + delimiter +
-                character_cleaned["traditionalcomponents"] +
-                "\n"
-            )
+            output_file.write(character_line + "\n")
 
             if logging.getLogger().level == logging.DEBUG:
                 logging.debug("\n-------------------------------------------\n")
-                logging.debug("Writing: " +
-                              character_cleaned["simplified"] + delimiter +
-                              character_cleaned["traditional"] + delimiter +
-                              character_cleaned["defs"] + delimiter +
-                              character_cleaned["pinyin"] + delimiter +
-                              character_cleaned["soundword"] + delimiter +
-                              "<img src=" + filename + "/>" + delimiter +
-                              character_cleaned["mnemonics"] + delimiter +
-                              character_cleaned["story"] + delimiter +
-                              character_cleaned["examples"] + delimiter +
-                              character_cleaned["additionalinfo"] + delimiter +
-                              character_cleaned["simplifiedcomponents"] + delimiter +
-                              character_cleaned["traditionalcomponents"] +
-                              "\n"
-                              )
+                logging.debug(character_line + "\n")
                 logging.debug("\n-------------------------------------------\n")
             else:
                 logging.info("Writing the character: " + character["traditional"])
+
+
+def output_combined(output_file_name, char_images_folder, word_list):
+    with open(output_file_name, 'w', encoding="utf-8-sig") as output_file:
+        for word in word_list:
+
+            output_file.write(_get_word_line(word, "\\"))
+
+            output_file.write(
+                get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "<br>") + "\n")
 
 
 def get_words(words, ebook=None, skip_choices=False):
