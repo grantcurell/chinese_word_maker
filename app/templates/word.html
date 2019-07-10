@@ -1,3 +1,3 @@
-<div style="font-family: Kaiti;  font-size: 78px;">{{ word.traditional }} / {{ word.simplified }}</div>
+<div style="font-family: Kaiti;  font-size: 78px;">{{ word.traditional }} {{ '/' if 'simplified' in word else '' }} {{ word.simplified if 'simplified' in word else '' }}</div>
 <div style="font-family: Gentium Plus; font-size: 36px; color: #005500; text-align:centered">{{ word.pinyin }}</div>
 <div style="font-family: Georgia; font-size: 36px;  text-align:centered">{{ ", ".join(word.defs) }}</div>

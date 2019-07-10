@@ -273,10 +273,11 @@ def process_word_entry(entry, ebook=None):
             # Remember some characters might look the same, but have multiple meanings depending on pronunciation. That
             # means we need to loop over all the possible characters with that appearance and find the one whose pinyin
             # matches that of our word
-            for individual_character in individual_characters:
-                if individual_character["pinyin_text"] in organized_entry["pinyin"]:
-                    logging.info("Found a match!")
-                    organized_entry["characters"].append(individual_character)
+            if individual_characters:
+                for individual_character in individual_characters:
+                    if individual_character["pinyin_text"] in organized_entry["pinyin"]:
+                        logging.info("Found a match!")
+                        organized_entry["characters"].append(individual_character)
 
     return organized_entry
 
