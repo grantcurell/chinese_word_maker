@@ -2,7 +2,6 @@ from urllib.request import urlopen
 from urllib.parse import quote
 from bs4 import BeautifulSoup
 import ebooklib
-from ebooklib import epub
 import traceback
 import logging
 import pprint
@@ -166,36 +165,32 @@ def output_characters(chars_output_file_name, char_images_folder, char_list):
                 logging.info("Writing the character: " + character["traditional"])
 
 
-def get_words(input_file_name, ebook_path=None, skip_choices=False):
+def get_words(words, ebook=None, skip_choices=False):
     """
-    Reaches out to www.mdbg.net and grabs the data for each of the words on which you want data
+    Reaches out to www.mdbg.net and grabs the data for each of the words on which you want data or searches an
+    instance of Chinese Blockbust eBook for characters.
 
-    :param str input_file_name: The name of the file which contains the words we want to grab
-    :param str ebook_path: Path to the ebook you want to read from
-    :param bool skip_choices: Whether you want to skip selection of the different characters
-    :return: Returns a list of the words you want added to Anki with their corresponding data
-    :rtype: list
+    :param list words: The list of the words you want to add
+    :param ebook ebook: An eBook file object
+    :param bool skip_choices: Whether you want to skip selection of the different possible options
+    :return: Returns two lists, one with the words found and the other with the characters found
+    :rtype: tuple of lists
     """
 
-    with open(input_file_name, encoding="utf-8-sig") as input_file:
+    new_words = []  # type: list
+    new_chars = []  # type: list
 
-        new_words = []  # type: list
-        new_chars = []  # type: list
-        book = None
+    if ebook:
 
-        if ebook_path:
-            book = epub.read_epub(ebook_path)  # type: ebooklib.epub.EpubBook
-
-        for word in input_file.readlines():
-
+        for word in words:
             try:
                 word = word.strip()  # type: str
 
                 # Handle words and characters differently. For individual characters, there is a special feature for
                 # looking them up in the book Chinese Blockbuster and making flashcards. This will only be active if
                 # the ebook_path is provided on the command line.
-                if len(word) <= 2 and book is not None:
-                    new_char = process_char_entry(book, word)
+                if len(word) < 2 and ebook is not None:
+                    new_char = process_char_entry(ebook, word)
                     if new_char is not None:
                         if len(new_char) > 1:
                             for character in new_char:
@@ -203,9 +198,9 @@ def get_words(input_file_name, ebook_path=None, skip_choices=False):
                         else:
                             new_chars.append(new_char[0])
                 else:
-                    new_word = process_word(word)
+                    new_word = process_word(word, skip_choices, ebook)
                     if new_word:
-                        new_words.append()
+                        new_words.append(new_word)
 
             except KeyboardInterrupt:
                 if not query_yes_no("You have pressed ctrl+C. Are you sure you want to exit?"):
@@ -221,14 +216,20 @@ def get_words(input_file_name, ebook_path=None, skip_choices=False):
                         "Do you want to continue with the next word?"):
                     exit(1)
 
+    if len(new_chars) < 1:
+        new_chars = None
+    if len(new_words) < 1:
+        new_words = None
+
     return new_words, new_chars
 
 
-def process_word_entry(entry):
+def process_word_entry(entry, ebook=None):
     """
     Processes a single row from www.mbdg.net and returns it in a dictionary
 
     :param bs4.element.Tag entry: This is equivalent to one row in the results from www.mdbg.net
+    :param ebook ebook: An eBook file object
     :return: Returns a list of dictionary items containing each of the possible results
     :rtype: list of dicts
     """
@@ -259,17 +260,36 @@ def process_word_entry(entry):
     else:
         organized_entry.update({"hsk": ""})
 
+    if ebook:
+        organized_entry["characters"] = []  # type: list
+
+        # Loop over every character which is part of the word
+        for character in organized_entry["traditional"]:
+
+            logging.info("Searching for " + organized_entry["traditional"] + "'s character components.")
+
+            individual_characters = process_char_entry(ebook, character)
+
+            # Remember some characters might look the same, but have multiple meanings depending on pronunciation. That
+            # means we need to loop over all the possible characters with that appearance and find the one whose pinyin
+            # matches that of our word
+            for individual_character in individual_characters:
+                if individual_character["pinyin_text"] in organized_entry["pinyin"]:
+                    logging.info("Found a match!")
+                    organized_entry["characters"].append(individual_character)
+
     return organized_entry
 
 
-def process_word(word, skip_choices):
+def process_word(word, skip_choices, ebook=None):
     """
     Processes a word in the list of words
 
     :param str word: The word from the list
     :param skip_choices: Whether we should skip prompting the user if there are multiple choices or not
-    :return: TODO NEEED TO ADD THIS
-    :rtype: TODO NEED TO ADD THIS
+    :param ebook ebook: An eBook file object
+    :return: Returns a dictionary containing the word's entry
+    :rtype: dict
     """
 
     pp = pprint.PrettyPrinter(indent=4)
@@ -289,18 +309,18 @@ def process_word(word, skip_choices):
     entries = []  # type: list
 
     for entry in results:
-        entries.append(process_word_entry(entry))
+        entries.append(process_word_entry(entry, ebook))
 
     if len(entries) > 1 and skip_choices is not True:
         print("It looks like there are multiple definitions for this word available. "
               "Which one would you like to use?")
 
-        print("\n\n-------- Option 0 ---------\n\n")
+        print("\n\n-------- Option 0 ---------\n")
         print("Type 0 to skip.")
 
         for index, entry in enumerate(entries):
-            print("\n\n-------- Option " + str(index + 1) + "---------\n\n")
-            pp.pprint(entry)
+            print("\n-------- Option " + str(index + 1) + "---------\n")
+            print(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
 
         print("\n\n")
         selection = -1  # type: int
@@ -325,7 +345,7 @@ def process_char_entry(book, char):
     :param str char: The Character we want to process
     :return: Returns a list of organized entries dictionaries. Most of the time there will be only one, but sometimes
              the book has multiple entries for a single character.
-    :rtype: list of dict - Returns a dictionary containing all the attributes of a character
+    :rtype: list of dict - Returns a list of dictionaries containing all the attributes of a character
     """
 
     logging.info("-------------------------------------")
@@ -347,7 +367,9 @@ def process_char_entry(book, char):
         loop_counter += 1
 
         content = doc.content.decode('utf-8')
-        #logging.debug(content)
+
+        # You can uncomment this if you want to see a dump of each page's XML
+        # logging.debug(content)
 
         organized_entry = {}  # type: dict
 

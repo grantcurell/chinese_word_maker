@@ -5,10 +5,11 @@ __license__ = "GPLv3"
 __version__ = "1.2.1"
 __maintainer__ = "Grant Curell"
 
-from app import app
+from ebooklib import epub
 from chinese_tarjetas.chinese_tarjetas import *
 from argparse import ArgumentParser
 from pathlib import Path
+from app import app
 
 
 def main():
@@ -88,7 +89,11 @@ def main():
     else:
         if args.input_file_name:
             if Path(args.input_file_name).is_file():
-                words = get_words(args.input_file_name, args.ebook_path, args.skip_choices)
+                words = ()
+                with open(args.input_file, encoding="utf-8-sig") as input_file:
+                    for word in input_file.readlines():
+                        words.append(word)
+                words = get_words(args.input_file_name, app.config["ebook"], args.skip_choices)
                 output_words(args.words_output_file_name, words[0])
                 output_characters(args.chars_output_file_name, args.chars_image_folder, words[1])
             else:

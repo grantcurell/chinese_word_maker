@@ -217,7 +217,7 @@ class CharacterForm:
 
     # If you need to add elements to the navbar you can do it here
     navbar_elements = OrderedDict([
-        ('Character Lookup', {'url': '/kickstart', 'key': 'tn_kickstart'})
+        ('Character Lookup', {'url': '/character', 'key': 'tn_character'})
         , ('Help', {'url': '/help', 'key': 'tn_help'})])
 
     character = Button(
