@@ -123,6 +123,7 @@ def _get_word_line(word, delimiter):
     return word["traditional"] + delimiter + word["simplified"] + delimiter + word["pinyin"] + delimiter + \
            "<br>".join(word["defs"]).replace(delimiter, "") + delimiter + word["hsk"].replace(" ", "")
 
+
 def output_words(words_output_file_name, word_list):
     """
     Outputs the new words to a file for import into Anki
@@ -244,7 +245,7 @@ def output_combined(output_file_name, char_images_folder, word_list):
     with open(output_file_name, 'w', encoding="utf-8-sig") as output_file:
         for word in word_list:
 
-            output_file.write(_get_word_line(word, "\\"))
+            output_file.write(_get_word_line(word, "\\") + "\\")
 
             output_file.write(
                 get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "<br>") + "\n")
