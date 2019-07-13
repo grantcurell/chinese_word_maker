@@ -457,6 +457,13 @@ def process_word(word, skip_choices=False, ebook=None, select_first=False):
 
 
 def resolve_href(href, book):
+    """
+    Resolves an HREF from the text
+
+    :param href: The HREF you want to resolve
+    :param book: A pointer to an ebook
+    :return: Returns the HTML for the resolved HREF
+    """
 
     potential_hrefs = []
 

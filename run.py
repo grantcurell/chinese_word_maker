@@ -2,7 +2,7 @@ __author__ = "Grant Curell"
 __copyright__ = "Do what you want with it"
 
 __license__ = "GPLv3"
-__version__ = "1.2.1"
+__version__ = "1.3.0"
 __maintainer__ = "Grant Curell"
 
 from ebooklib import epub
