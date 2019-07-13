@@ -81,7 +81,8 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
                 webpage += template.render(image_path=basename(organized_entry["image"].file_name),
                                            results=organized_entry) + "<hr>"
 
-    return webpage
+    # There are a huge number of BR tags and they aren't actually necessary.
+    return webpage.replace("<br>", "")
 
 
 def query_yes_no(question, default="yes"):
@@ -189,7 +190,7 @@ def _get_character_line(character, image_file_name, delimiter):
 
         # The image value has no replace capability so we have to skip it
         if key != "image" and key != "image_content" and key != "has_duplicates":
-            character_cleaned[key] = value.replace("\n", "<br>")
+            character_cleaned[key] = value.replace("\n", "")
 
     # The only if conditions ensure that if a field is missing because it isn't part of a page that an error
     # isn't thrown.
@@ -265,7 +266,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter):
 
             output_file.write(_get_word_line(word, delimiter) + delimiter)
 
-            line = get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "<br>") + "\n"
+            line = get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "") + "\n"
 
             output_file.write(line.replace(delimiter, ""))
 
