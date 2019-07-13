@@ -558,13 +558,14 @@ def process_char_entry(book, char):
                 if continued:
                     continued = False
 
+                # Remove all the HREFs which will clutter the card.
                 for atag in soup.findAll("a"):
-                    if "href" in atag.attrs:
-                        reference = resolve_href(atag.attrs["href"], book)
-                        if reference:
-                            atag.replace_with(reference)
-                        else:
-                            atag.extract()
+                    # if "href" in atag.attrs:
+                    #     reference = resolve_href(atag.attrs["href"], book)
+                    #     if reference:
+                    #         atag.replace_with(reference)
+                    #     else:
+                    atag.extract()
 
                 logging.info("Found character " + char + " in the book!")
 
