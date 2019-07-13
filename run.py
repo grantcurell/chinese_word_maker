@@ -96,6 +96,8 @@ def main():
         if args.input_file_name:
             if not args.delimiter:
                 args.delimiter = "~"
+            else:
+                args.delimiter = args.delimiter.strip('\'').strip('\"')
 
             if Path(args.input_file_name).is_file():
                 words = []

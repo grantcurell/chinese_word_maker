@@ -63,7 +63,7 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
                     if "simplified" in organized_entry:
                         character_searches.write(
                             organized_entry["traditional"] + "/" + organized_entry["simplified"] + " \\ " +
-                            organized_entry["pinyin_text"] + " \\ " +  organized_entry["defs_text"] + "\n")
+                            organized_entry["pinyin_text"] + " \\ " + organized_entry["defs_text"] + "\n")
                     else:
                         character_searches.write(
                             organized_entry["traditional"] + " \\ " + organized_entry["pinyin_text"] + " \\ "
@@ -75,7 +75,11 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
             else:
                 template = env.get_template("character_no_style.html")
 
-            webpage += template.render(image_path=image_path, results=organized_entry) + "<hr>"
+            if server_mode:
+                webpage += template.render(image_path=image_path, results=organized_entry) + "<hr>"
+            else:
+                webpage += template.render(image_path=basename(organized_entry["image"].file_name),
+                                           results=organized_entry) + "<hr>"
 
     return webpage
 
@@ -261,8 +265,9 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter):
 
             output_file.write(_get_word_line(word, delimiter) + delimiter)
 
-            output_file.write(
-                get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "<br>") + "\n")
+            line = get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "<br>") + "\n"
+
+            output_file.write(line.replace(delimiter, ""))
 
 
 def get_words(words, ebook=None, skip_choices=False, select_first=False):
@@ -450,6 +455,35 @@ def process_word(word, skip_choices=False, ebook=None, select_first=False):
         return entries[0]
 
 
+def resolve_href(href, book):
+
+    potential_hrefs = []
+
+    href = href.split("#")
+
+    url = href[0]
+    anchor = href[1]
+
+    for item in book.get_items():
+        if url in item.get_name():
+            potential_hrefs.append(item)
+
+    for href in potential_hrefs:
+
+        href_content = BeautifulSoup(href.content, 'lxml')
+
+        results = href_content.find(id=anchor)
+
+        if results:
+            for element in results.next_elements:
+                if element.name == "td":
+                    for child in element.contents[0].children:
+                        if child.string:
+                            child.string = child.string.replace('/', '').replace("\n", "").strip()
+                    return element.contents[0]
+            return None
+
+
 def process_char_entry(book, char):
     """
     Reads from an EPUB formatted version of the Chinese Blockbuster series
@@ -516,6 +550,14 @@ def process_char_entry(book, char):
                 if continued:
                     continued = False
 
+                for atag in soup.findAll("a"):
+                    if "href" in atag.attrs:
+                        reference = resolve_href(atag.attrs["href"], book)
+                        if reference:
+                            atag.replace_with(reference)
+                        else:
+                            atag.extract()
+
                 logging.info("Found character " + char + " in the book!")
 
                 character_header = character_header.text.split('[')
@@ -533,6 +575,16 @@ def process_char_entry(book, char):
                         exit(0)
                     for line in traceback.format_stack():
                         logging.debug(line.strip())
+
+                # Search through the EPUB's images and find the one that is used on our page.
+                image_name = ntpath.basename(soup.find("img").attrs['src'])  # Grab the image name
+
+                organized_entry["image"] = book.get_item_with_href(top_level_dir + "/images/" + image_name)
+                organized_entry["image_content"] = organized_entry["image"].content
+
+                # Now that we have saved out the image data, remove all remaining image links in the page.
+                for image in soup.findAll("img"):
+                    image.extract()
 
                 # Get the rest of the data
                 for heading in soup.findAll("p", {"class": "p_cat_heading"}):
@@ -576,12 +628,6 @@ def process_char_entry(book, char):
                 if found_char:
                     organized_entries_list[-1]["has_duplicates"] = True
                     organized_entry["has_duplicates"] = True
-
-                # Search through the EPUB's images and find the one that is used on our page.
-                image_name = ntpath.basename(soup.find("img").attrs['src'])  # Grab the image name
-
-                organized_entry["image"] = book.get_item_with_href(top_level_dir + "/images/" + image_name)
-                organized_entry["image_content"] = organized_entry["image"].content
 
                 # Get the text for simplified components
                 content = soup.select_one(
