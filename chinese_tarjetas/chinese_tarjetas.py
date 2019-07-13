@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 import ebooklib
 import traceback
 import logging
-import pprint
 import os
 import ntpath
 import sys
@@ -64,12 +63,11 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
                     if "simplified" in organized_entry:
                         character_searches.write(
                             organized_entry["traditional"] + "/" + organized_entry["simplified"] + " \\ " +
-                            organized_entry["pinyin_text"] + " \\ " + organized_entry["soundword_text"] +
-                            " \\ " + organized_entry["defs_text"] + "\n")
+                            organized_entry["pinyin_text"] + " \\ " +  organized_entry["defs_text"] + "\n")
                     else:
                         character_searches.write(
-                            organized_entry["traditional"] + " \\ " + organized_entry["pinyin_text"] + " \\ " +
-                            organized_entry["soundword_text"] + " \\ " + organized_entry["defs_text"] + "\n")
+                            organized_entry["traditional"] + " \\ " + organized_entry["pinyin_text"] + " \\ "
+                            + organized_entry["defs_text"] + "\n")
 
             env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
             if server_mode:
@@ -267,7 +265,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter):
                 get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "<br>") + "\n")
 
 
-def get_words(words, ebook=None, skip_choices=False):
+def get_words(words, ebook=None, skip_choices=False, select_first=False):
     """
     Reaches out to www.mdbg.net and grabs the data for each of the words on which you want data or searches an
     instance of Chinese Blockbust eBook for characters.
@@ -275,6 +273,7 @@ def get_words(words, ebook=None, skip_choices=False):
     :param list words: The list of the words you want to add
     :param ebook ebook: An eBook file object
     :param bool skip_choices: Whether you want to skip selection of the different possible options
+    :param bool select_first: Instead of skipping the choices it will just automatically select the first choice available
     :return: Returns two lists, one with the words found and the other with the characters found
     :rtype: tuple of lists
     """
@@ -300,7 +299,7 @@ def get_words(words, ebook=None, skip_choices=False):
                         else:
                             new_chars.append(new_char[0])
                 else:
-                    new_word = process_word(word, skip_choices, ebook)
+                    new_word = process_word(word, skip_choices=skip_choices, ebook=ebook, select_first=select_first)
                     if new_word:
                         new_words.append(new_word)
 
@@ -326,12 +325,13 @@ def get_words(words, ebook=None, skip_choices=False):
     return new_words, new_chars
 
 
-def process_word_entry(entry, ebook=None):
+def process_word_entry(entry, ebook=None, select_first=False):
     """
     Processes a single row from www.mbdg.net and returns it in a dictionary
 
     :param bs4.element.Tag entry: This is equivalent to one row in the results from www.mdbg.net
     :param ebook ebook: An eBook file object
+    :param bool select_first: Instead of skipping the choices it will just automatically select the first choice available
     :return: Returns a list of dictionary items containing each of the possible results
     :rtype: list of dicts
     """
@@ -386,24 +386,23 @@ def process_word_entry(entry, ebook=None):
                         organized_entry["characters"].append(individual_character)
                         exact_match_found = True
 
-            if not exact_match_found:
+            if not exact_match_found and individual_characters:
                 organized_entry["characters"].append(individual_characters[0])
 
     return organized_entry
 
 
-def process_word(word, skip_choices, ebook=None):
+def process_word(word, skip_choices=False, ebook=None, select_first=False):
     """
     Processes a word in the list of words
 
     :param str word: The word from the list
     :param skip_choices: Whether we should skip prompting the user if there are multiple choices or not
     :param ebook ebook: An eBook file object
+    :param bool select_first: Instead of skipping the choices it will just automatically select the first choice available
     :return: Returns a dictionary containing the word's entry
     :rtype: dict
     """
-
-    pp = pprint.PrettyPrinter(indent=4)
 
     logging.info("Requested word is: " + word)
     logging.info("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word)
@@ -420,7 +419,7 @@ def process_word(word, skip_choices, ebook=None):
     entries = []  # type: list
 
     for entry in results:
-        entries.append(process_word_entry(entry, ebook))
+        entries.append(process_word_entry(entry, ebook, select_first=select_first))
 
     if len(entries) > 1 and skip_choices is not True:
         print("It looks like there are multiple definitions for this word available. "
@@ -436,8 +435,11 @@ def process_word(word, skip_choices, ebook=None):
         print("\n\n")
         selection = -1  # type: int
 
-        while (selection > len(entries) or selection < 1) and selection != 0:
-            selection = int(input("Enter your selection: "))
+        if select_first:
+            selection = 1
+        else:
+            while (selection > len(entries) or selection < 1) and selection != 0:
+                selection = int(input("Enter your selection: "))
 
         if selection != 0:
             return entries[selection - 1]

@@ -12,7 +12,7 @@ def _lookup_character():
 
     input_text = request.args.get('character_to_lookup').strip()
 
-    word, chars = get_words([input_text], app.config["ebook"], skip_choices=True)
+    word, chars = get_words([input_text], app.config["ebook"], select_first=True)
 
     if chars is not None:
 
