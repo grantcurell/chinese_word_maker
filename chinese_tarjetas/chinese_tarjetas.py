@@ -15,12 +15,13 @@ from ntpath import basename
 from os import path
 
 
-def get_chars_html(characters, image_location=path.join("app", "static")):
+def get_chars_html(characters, image_location=path.join("app", "static"), server_mode=False):
     """
     Grabs the HTML for each of the characters in a list of characters
 
-    :param characters: A list ofg the characters you want to grab
-    :param image_location Used to optionally control where the image is written to
+    :param characters str A list ofg the characters you want to grab
+    :param image_location str Used to optionally control where the image is written to
+    :param server_mode bool Used to determine whether this was called by a running web server or not
     :return: Returns a webpgae with all the character data rendered
     :rtype: str
     """
@@ -71,7 +72,10 @@ def get_chars_html(characters, image_location=path.join("app", "static")):
                             organized_entry["soundword_text"] + " \\ " + organized_entry["defs_text"] + "\n")
 
             env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
-            template = env.get_template("character_no_style.html")
+            if server_mode:
+                template = env.get_template("character.html")
+            else:
+                template = env.get_template("character_no_style.html")
 
             webpage += template.render(image_path=image_path, results=organized_entry) + "<hr>"
 
@@ -124,12 +128,13 @@ def _get_word_line(word, delimiter):
            "<br>".join(word["defs"]).replace(delimiter, "") + delimiter + word["hsk"].replace(" ", "")
 
 
-def output_words(words_output_file_name, word_list):
+def output_words(words_output_file_name, word_list, delimiter):
     """
     Outputs the new words to a file for import into Anki
 
     :param str words_output_file_name: The name of the file to which we want to write the new words
     :param list word_list: The list of words we want to write to file
+    :param str delimiter: The delimiter you want to use for your flashcards
     :return: Returns nothing
     """
 
@@ -140,7 +145,7 @@ def output_words(words_output_file_name, word_list):
         for word in word_list:
 
             # You need the <br/>s in anki for newlines. The strip makes sure there isn't one randomly trailing
-            output_file.write(_get_word_line(word, ",") + "\n")
+            output_file.write(_get_word_line(word, delimiter) + "\n")
 
             logging.info("Writing: " + _get_word_line(word))
 
@@ -201,13 +206,14 @@ def _get_character_line(character, image_file_name, delimiter):
         character_cleaned["traditionalcomponents"]
 
 
-def output_characters(chars_output_file_name, char_images_folder, char_list):
+def output_characters(chars_output_file_name, char_images_folder, char_list, delimiter):
     """
     Outputs the new characters to a file for import into Anki
 
     :param str chars_output_file_name: The name of the file to which we want to write the new characters
     :param str char_images_folder: The folder which will store the images associated with the character images
     :param list char_list: The list of characters we want to write to file
+    :param str delimiter: The delimiter you want to use for your flashcards
     :return: Returns nothing
     """
 
@@ -229,7 +235,7 @@ def output_characters(chars_output_file_name, char_images_folder, char_list):
             with open(os.path.join(char_images_folder, filename), "wb") as img_file:
                 img_file.write(character["image_content"])  # Output the image to disk
 
-            character_line = _get_character_line(character, filename, "\\")
+            character_line = _get_character_line(character, filename, delimiter)
 
             output_file.write(character_line + "\n")
 
@@ -241,11 +247,21 @@ def output_characters(chars_output_file_name, char_images_folder, char_list):
                 logging.info("Writing the character: " + character["traditional"])
 
 
-def output_combined(output_file_name, char_images_folder, word_list):
+def output_combined(output_file_name, char_images_folder, word_list, delimiter):
+    """
+    Allows you to output flashcards with both the word and the character embedded in them.
+
+    :param str output_file_name: The name of the file to which we want to write the new flashcards
+    :param str char_images_folder: The folder which will store the images associated with the character images
+    :param list word_list: The list of words we want to write to file
+    :param str delimiter: The delimiter you want to use for your flashcards
+    :return: Returns nothing
+    """
+
     with open(output_file_name, 'w', encoding="utf-8-sig") as output_file:
         for word in word_list:
 
-            output_file.write(_get_word_line(word, "\\") + "\\")
+            output_file.write(_get_word_line(word, delimiter) + delimiter)
 
             output_file.write(
                 get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "<br>") + "\n")
@@ -356,6 +372,10 @@ def process_word_entry(entry, ebook=None):
 
             individual_characters = process_char_entry(ebook, character)
 
+            # This is to cover words like 這個. The problem is that when the word comes across it is a neutral tone
+            # so an exact match is never found. Instead we just default to using the first match in these cases.
+            exact_match_found = False
+
             # Remember some characters might look the same, but have multiple meanings depending on pronunciation. That
             # means we need to loop over all the possible characters with that appearance and find the one whose pinyin
             # matches that of our word
@@ -364,6 +384,10 @@ def process_word_entry(entry, ebook=None):
                     if individual_character["pinyin_text"] in organized_entry["pinyin"]:
                         logging.info("Found a match!")
                         organized_entry["characters"].append(individual_character)
+                        exact_match_found = True
+
+            if not exact_match_found:
+                organized_entry["characters"].append(individual_characters[0])
 
     return organized_entry
 

@@ -16,12 +16,12 @@ def _lookup_character():
 
     if chars is not None:
 
-        return get_chars_html(chars)
+        return get_chars_html(chars, server_mode=True)
 
     elif word is not None:
 
         webpage += render_template('word.html', word=word[0]) + "<hr>"
-        webpage += get_chars_html(word[0]["characters"])
+        webpage += get_chars_html(word[0]["characters"], server_mode=True)
 
         if not path.exists('word_searches.txt'):
             with open('word_searches.txt', 'w'): pass
@@ -36,8 +36,8 @@ def _lookup_character():
                 with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
                     if "simplified" in word[0]:
                         word_file.write(
-                            word[0]["traditional"] + " / " + word[0]["simplified"] + " / " + ",".join(word[0]["defs"]) +
-                            "\n")
+                            word[0]["traditional"] + " / " + word[0]["simplified"] + " / " + word[0]["pinyin"] + " / "
+                            + ",".join(word[0]["defs"]) + "\n")
                     else:
                         word_file.write(word[0]["traditional"] + " / " + ",".join(word[0]["defs"]) + "\n")
 

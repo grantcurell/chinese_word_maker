@@ -38,6 +38,9 @@ def main():
                         choices=['debug', 'info', 'warning', 'error', 'critical'],
                         help='A path to Chinese Blockbuster in EPUB format. In my case, I bought all of them and merged'
                              ' them into one big book.')
+    parser.add_argument('--delimiter', metavar='DELIMITER', dest="delimiter", required=False, type=str, default="~",
+                        help='Allows you to optionally select the delimiter you use for the delimiter in your Anki'
+                             'cards. By default it is ~ which should avoid colliding with anything.')
     parser.add_argument('--use-media-folder', dest="use_media_folder", required=False, action='store_true',
                         help='If this option is passed the program will try to write to Anki\'s media folder directly.'
                              ' If you pass this argument, you must also pass your Anki username.')
@@ -91,6 +94,9 @@ def main():
             exit(0)
     else:
         if args.input_file_name:
+            if not args.delimiter:
+                args.delimiter = "~"
+
             if Path(args.input_file_name).is_file():
                 words = []
                 with open(args.input_file_name, encoding="utf-8-sig") as input_file:
@@ -100,10 +106,10 @@ def main():
                 words, characters = get_words(words, app.config["ebook"], args.skip_choices)
 
                 if args.combined_output:
-                    output_combined(args.words_output_file_name, args.chars_image_folder, words)
+                    output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter)
                 else:
-                    output_words(args.words_output_file_name, words)
-                    output_characters(args.chars_output_file_name, args.chars_image_folder, characters)
+                    output_words(args.words_output_file_name, words, args.delimiter)
+                    output_characters(args.chars_output_file_name, args.chars_image_folder, characters, args.delimiter)
             else:
                 print(args.input_file_name + " is not a file or doesn't exist!")
                 exit(0)
