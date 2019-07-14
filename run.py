@@ -110,8 +110,10 @@ def main():
                 if args.combined_output:
                     output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter)
                 else:
-                    output_words(args.words_output_file_name, words, args.delimiter)
-                    output_characters(args.chars_output_file_name, args.chars_image_folder, characters, args.delimiter)
+                    if words:
+                        output_words(args.words_output_file_name, words, args.delimiter)
+                    if characters:
+                        output_characters(args.chars_output_file_name, args.chars_image_folder, characters, args.delimiter)
             else:
                 print(args.input_file_name + " is not a file or doesn't exist!")
                 exit(0)
