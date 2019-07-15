@@ -12,6 +12,7 @@ from datetime import datetime
 import jinja2
 from ntpath import basename
 from os import path
+from unidecode import unidecode
 
 
 def get_chars_html(characters, image_location=path.join("app", "static"), server_mode=False):
@@ -40,7 +41,8 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
             else:
                 image_path = image_location
 
-            with open(path.join(image_location, basename(organized_entry["image"].file_name)), "wb") as img_file:
+            with open(path.join(image_location, basename(organized_entry["image"].file_name) + "-" +
+                                                unidecode(organized_entry["pinyin"])), "wb") as img_file:
                 img_file.write(organized_entry["image_content"])  # Output the image to disk
 
         if not path.exists('character_searches.txt'):
@@ -235,7 +237,7 @@ def output_characters(chars_output_file_name, char_images_folder, char_list, del
             # or Windows. The line directly below is necessary to ensure the filename is unique
             filename = str(int(datetime.now().timestamp())) + "-" + ntpath.basename(
                 character["image"].file_name).replace("jpeg", "jpg")  # type: str
-            with open(os.path.join(char_images_folder, filename), "wb") as img_file:
+            with open(os.path.join(char_images_folder, filename + "-" + unidecode(character["pinyin"])), "wb") as img_file:
                 img_file.write(character["image_content"])  # Output the image to disk
 
             character_line = _get_character_line(character, filename, delimiter)
@@ -331,13 +333,12 @@ def get_words(words, ebook=None, skip_choices=False, select_first=False):
     return new_words, new_chars
 
 
-def process_word_entry(entry, ebook=None, select_first=False):
+def process_word_entry(entry, ebook=None):
     """
     Processes a single row from www.mbdg.net and returns it in a dictionary
 
     :param bs4.element.Tag entry: This is equivalent to one row in the results from www.mdbg.net
     :param ebook ebook: An eBook file object
-    :param bool select_first: Instead of skipping the choices it will just automatically select the first choice available
     :return: Returns a list of dictionary items containing each of the possible results
     :rtype: list of dicts
     """
