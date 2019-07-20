@@ -12,7 +12,6 @@ from datetime import datetime
 import jinja2
 from ntpath import basename
 from os import path
-from unidecode import unidecode
 
 
 def create_image_name(organized_entry, image_location=""):
