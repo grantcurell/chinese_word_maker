@@ -15,13 +15,29 @@ from os import path
 from unidecode import unidecode
 
 
+def create_image_name(organized_entry, image_location=""):
+    """
+    Used to do the path munging to create the image location entry
+
+    :param dict organized_entry: The organized entry for which you want to create the image location string
+    :param str image_location: The location you want to store the image. Nothing by default
+    :return: Returns a string with the full path to the image
+    :rtype: str
+    """
+
+    file_name = basename(organized_entry["image"].file_name.split('.')[0])
+    file_extension = basename(organized_entry["image"].file_name.split('.')[1])
+
+    return path.join(image_location, file_name + "-" + organized_entry["pinyin_text"] + '.' + file_extension)
+
+
 def get_chars_html(characters, image_location=path.join("app", "static"), server_mode=False):
     """
     Grabs the HTML for each of the characters in a list of characters
 
-    :param characters str A list ofg the characters you want to grab
-    :param image_location str Used to optionally control where the image is written to
-    :param server_mode bool Used to determine whether this was called by a running web server or not
+    :param  str characters: A list ofg the characters you want to grab
+    :param str image_location: Used to optionally control where the image is written to
+    :param bool server_mode: Used to determine whether this was called by a running web server or not
     :return: Returns a webpgae with all the character data rendered
     :rtype: str
     """
@@ -41,8 +57,7 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
             else:
                 image_path = image_location
 
-            with open(path.join(image_location, basename(organized_entry["image"].file_name) + "-" +
-                                                unidecode(organized_entry["pinyin"])), "wb") as img_file:
+            with open(create_image_name(organized_entry, image_location), "wb") as img_file:
                 img_file.write(organized_entry["image_content"])  # Output the image to disk
 
         if not path.exists('character_searches.txt'):
@@ -91,8 +106,8 @@ def query_yes_no(question, default="yes"):
     """
     Ask a yes/no question via raw_input() and return the answer.
 
-    :param question str A string that is presented to the user.
-    :param default is the presumed answer if the user just hits <Enter>.
+    :param str question: A string that is presented to the user.
+    :param str default: is the presumed answer if the user just hits <Enter>.
     :return The "answer" return value is True for "yes" or False for "no".
     :rtype bool
     """
@@ -123,8 +138,8 @@ def _get_word_line(word, delimiter):
     """
     Gets the string used for outputting words
 
-    :param word: The word you want to output
-    :param delimiter: The delimiter you want to use in the output
+    :param dict word: The word you want to output
+    :param str delimiter: The delimiter you want to use in the output
     :return: String used for outputting to an Anki flashcard for words
     :rtype: str
     """
@@ -159,9 +174,9 @@ def _get_character_line(character, image_file_name, delimiter):
     """
     Gets the line to be output for a single character
 
-    :param character: The character we want to output
-    :param image_file_name: The image file name for the character in question
-    :param delimiter: The delimiter you want to use in the output
+    :param dict character: The character we want to output
+    :param str image_file_name: The image file name for the character in question
+    :param str delimiter: The delimiter you want to use in the output
     :return: Returns the HTML string for the character
     :rtype: str
     """
@@ -237,7 +252,7 @@ def output_characters(chars_output_file_name, char_images_folder, char_list, del
             # or Windows. The line directly below is necessary to ensure the filename is unique
             filename = str(int(datetime.now().timestamp())) + "-" + ntpath.basename(
                 character["image"].file_name).replace("jpeg", "jpg")  # type: str
-            with open(os.path.join(char_images_folder, filename + "-" + unidecode(character["pinyin"])), "wb") as img_file:
+            with open(create_image_name(character, char_images_folder), "wb") as img_file:
                 img_file.write(character["image_content"])  # Output the image to disk
 
             character_line = _get_character_line(character, filename, delimiter)
@@ -426,7 +441,7 @@ def process_word(word, skip_choices=False, ebook=None, select_first=False):
     entries = []  # type: list
 
     for entry in results:
-        entries.append(process_word_entry(entry, ebook, select_first=select_first))
+        entries.append(process_word_entry(entry, ebook))
 
     if len(entries) > 1 and skip_choices is not True:
         print("It looks like there are multiple definitions for this word available. "
