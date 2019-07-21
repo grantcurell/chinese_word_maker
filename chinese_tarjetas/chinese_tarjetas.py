@@ -20,21 +20,25 @@ def create_image_name(organized_entry, image_location=""):
 
     :param dict organized_entry: The organized entry for which you want to create the image location string
     :param str image_location: The location you want to store the image. Nothing by default
-    :return: Returns a string with the full path to the image
+    :return: Returns a string with the full path to the image if image_location is defined otherwise it only returns
+             the base filename.
     :rtype: str
     """
 
     file_name = basename(organized_entry["image"].file_name.split('.')[0])
     file_extension = basename(organized_entry["image"].file_name.split('.')[1])
 
-    return path.join(image_location, file_name + "-" + organized_entry["pinyin_text"] + '.' + file_extension)
+    if image_location:
+        return path.join(image_location, file_name + "-" + organized_entry["pinyin_text"] + '.' + file_extension)
+    else:
+        return file_name + "-" + organized_entry["pinyin_text"] + '.' + file_extension
 
 
 def get_chars_html(characters, image_location=path.join("app", "static"), server_mode=False):
     """
     Grabs the HTML for each of the characters in a list of characters
 
-    :param  list characters: A list ofg the characters you want to grab
+    :param  list characters: A list of the characters you want to grab
     :param str image_location: Used to optionally control where the image is written to
     :param bool server_mode: Used to determine whether this was called by a running web server or not
     :return: Returns a webpgae with all the character data rendered
@@ -94,8 +98,8 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
             if server_mode:
                 webpage += template.render(image_path=image_path, results=organized_entry) + "<hr>"
             else:
-                webpage += template.render(image_path=basename(organized_entry["image"].file_name),
-                                           results=organized_entry) + "<hr>"
+                webpage += template.render(image_path=create_image_name(organized_entry), results=organized_entry) + \
+                           "<hr>"
 
     # There are a huge number of BR tags and they aren't actually necessary.
     return webpage.replace("<br>", "")
@@ -166,7 +170,7 @@ def output_words(words_output_file_name, word_list, delimiter):
             # You need the <br/>s in anki for newlines. The strip makes sure there isn't one randomly trailing
             output_file.write(_get_word_line(word, delimiter) + "\n")
 
-            logging.info("Writing: " + _get_word_line(word))
+            logging.info("Writing: " + _get_word_line(word, delimiter))
 
 
 def _get_character_line(character, image_file_name, delimiter):
