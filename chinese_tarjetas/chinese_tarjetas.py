@@ -69,8 +69,6 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
         with open("character_searches.txt", "r", encoding="utf-8-sig") as file:
             characters_file_contents = file.read()
 
-            print(characters_file_contents)
-
             if (organized_entry["traditional"] not in characters_file_contents and
                     ("simplified" in organized_entry and organized_entry["simplified"] not in characters_file_contents))\
                     or ("simplified" not in organized_entry and organized_entry["traditional"] not in characters_file_contents)\
