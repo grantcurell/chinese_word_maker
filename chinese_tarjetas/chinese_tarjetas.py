@@ -34,7 +34,7 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
     """
     Grabs the HTML for each of the characters in a list of characters
 
-    :param  str characters: A list ofg the characters you want to grab
+    :param  list characters: A list ofg the characters you want to grab
     :param str image_location: Used to optionally control where the image is written to
     :param bool server_mode: Used to determine whether this was called by a running web server or not
     :return: Returns a webpgae with all the character data rendered
@@ -52,7 +52,7 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
 
         if "image" in organized_entry:
             if image_location == path.join("app", "static"):
-                image_path = "static/" + basename(organized_entry["image"].file_name)
+                image_path = create_image_name(organized_entry, "static")
             else:
                 image_path = image_location
 
