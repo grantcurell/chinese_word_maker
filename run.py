@@ -1,7 +1,7 @@
 __author__ = "Grant Curell"
 __copyright__ = "Do what you want with it"
 __license__ = "GPLv3"
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 __maintainer__ = "Grant Curell"
 
 from ebooklib import epub
@@ -53,7 +53,24 @@ def main():
     parser.add_argument('--create-combined', dest="combined_output", required=False, action='store_true',
                         help='Set this option if you want to create flashcards with combined character mnemonics and'
                              ' words in a single output.')
+    parser.add_argument('--print-usage', dest="print_usage", required=False, action='store_true',
+                        help='Show example usage.')
+    
     args = parser.parse_args()  # type: argparse.Namespace
+
+    if not args.run_server and not args.input_file_name and not args.print_usage:
+        parser.print_help()
+        exit(0)
+
+    if args.print_usage:
+        print('\nCreate combined cards:')
+        print('python run.py --file backup.txt --ebook-path .\chinese_tarjetas\combined.epub --delimiter \ --use-media-folder --anki-username "User 1" --create-combined')
+        print('\nVisual Studio Code regex for excluding lines starting with asterisk: ^(?!\*).*\\n')
+        print('\nCreate character cards:')
+        print('python run.py --file backup.txt --ebook-path .\chinese_tarjetas\combined.epub --delimiter \ --use-media-folder --anki-username "User 1"')
+        print('\nMapping for "Chinse Words Updated" is:')
+        print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
+        exit(0)
 
     if args.use_media_folder:
         if args.anki_username:

@@ -249,14 +249,11 @@ def output_characters(chars_output_file_name, char_images_folder, char_list, del
 
         for character in char_list:
 
-            # Write the image for the character out to disk. The module ntpath ensures this is portable to Linux
-            # or Windows. The line directly below is necessary to ensure the filename is unique
-            filename = str(int(datetime.now().timestamp())) + "-" + ntpath.basename(
-                character["image"].file_name).replace("jpeg", "jpg")  # type: str
+            # Write the image for the character out to disk.
             with open(create_image_name(character, char_images_folder), "wb") as img_file:
                 img_file.write(character["image_content"])  # Output the image to disk
 
-            character_line = _get_character_line(character, filename, delimiter)
+            character_line = _get_character_line(character, create_image_name(character), delimiter)
 
             output_file.write(character_line + "\n")
 
