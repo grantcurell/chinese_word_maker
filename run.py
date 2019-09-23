@@ -53,12 +53,14 @@ def main():
     parser.add_argument('--create-combined', dest="combined_output", required=False, action='store_true',
                         help='Set this option if you want to create flashcards with combined character mnemonics and'
                              ' words in a single output.')
+    parser.add_argument('--single-word', metavar='SINGLE-WORD', dest="single_word", type=str, required=False,
+                        help='Use if you only want to create a card for a single word.')
     parser.add_argument('--print-usage', dest="print_usage", required=False, action='store_true',
                         help='Show example usage.')
     
     args = parser.parse_args()  # type: argparse.Namespace
 
-    if not args.run_server and not args.input_file_name and not args.print_usage:
+    if not args.run_server and not args.input_file_name and not args.print_usage and not args.single_word:
         parser.print_help()
         exit(0)
 
@@ -101,6 +103,11 @@ def main():
         print(args.ebook_path + " is not a file or that path doesn't exist!")
         exit(0)
 
+    if not args.delimiter:
+        args.delimiter = "\\"
+    else:
+        args.delimiter = args.delimiter.strip('\'').strip('\"')
+
     if args.run_server:
         if args.ebook_path:
             app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
@@ -108,13 +115,19 @@ def main():
         else:
             print("You cannot start a server without providing a path of a character ebook!")
             exit(0)
+    elif args.single_word:
+
+        words, characters = get_words(args.single_word, app.config["ebook"], args.skip_choices)
+
+        if args.combined_output:
+            output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter)
+        else:
+            if words:
+                output_words(args.words_output_file_name, words, args.delimiter)
+            if characters:
+                output_characters(args.chars_output_file_name, args.chars_image_folder, characters, args.delimiter)       
     else:
         if args.input_file_name:
-            if not args.delimiter:
-                args.delimiter = "\\"
-            else:
-                args.delimiter = args.delimiter.strip('\'').strip('\"')
-
             if Path(args.input_file_name).is_file():
                 words = []
                 with open(args.input_file_name, encoding="utf-8-sig") as input_file:
