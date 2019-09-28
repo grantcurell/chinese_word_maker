@@ -4,7 +4,7 @@
 // 5 in Number of nodes it will be transfered as the variable node_count)
 // here.
 
-$.get("{{ url_for('_lookup_character') }}", { character_to_lookup: $( 'input[name={{ object.field_id }}]' ).val() }, function(data){
+$.get("{{ url_for('_lookup_character') }}", { character_to_lookup: $( 'input[name={{ object.field_id }}]' ).val(), save_character: $('#{{ form.save_character_checkbox.checkbox_id }}').is(":checked") }, function(data){
 
   // The hide method is here because effects only work if the element
   // begins in a hidden state

@@ -222,7 +222,7 @@ class CharacterForm:
 
     character = Button(
         form_name='character_input'
-        , label='Character'
+        , label='Word'
         , button_text='Look Up!'
         , placeholder="Enter Character Here!"
         , input_type='text'
@@ -230,4 +230,10 @@ class CharacterForm:
         , valid_feedback='Hit "Look Up!"'
         , reaction_file='button_reaction_lookup_character.js')
 
-    dhcp_settings = [character]
+    save_character_checkbox = CheckBox(
+        form_name="save_character_checkbox"
+        , label="Save this character?"
+        , description=
+        "Use this to control whether to save this character in the list of characters to learn.")
+
+    dhcp_settings = [character, save_character_checkbox]

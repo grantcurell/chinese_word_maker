@@ -26,6 +26,12 @@ $(document).ready(function(){
         }
     });
 
+  $("#{{ form.save_character_checkbox.form_name }}").change(function() {
+
+
+
+  });
+
 });
 
 </script>
@@ -38,13 +44,21 @@ $(document).ready(function(){
     <div id="main_form">
       <div class="card" id="direct_to_disk_selected">
         <div class="card-body">
-          <h5>Character Lookup</h5>
+          <h5>Word Lookup</h5>
           {% with object = form.character %}
             {% include "button.html" %}
           {% endwith %}
           <hr>
             <div class="accordion" id="{{ [form.character.form_name, 'accordion'] | join('_') }}"></div>
         </div>
+          <form id='{{ form.save_character_checkbox.form_name }}' role=form>
+          <div class="form-check">
+            <input class="form-check-input {{ form.save_character_checkbox.css_class }}" type="checkbox" value="" id="{{ form.save_character_checkbox.form_name }}">
+            <label class="form-check-label" for="{{ form.save_character_checkbox.form_name }}">
+              {{ form.save_character_checkbox.label }}
+            </label>
+          </div>
+          </form>
       </div>
       <br />
     </div>

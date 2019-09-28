@@ -34,13 +34,14 @@ def create_image_name(organized_entry, image_location=""):
         return file_name + "-" + organized_entry["pinyin_text"] + '.' + file_extension
 
 
-def get_chars_html(characters, image_location=path.join("app", "static"), server_mode=False):
+def get_chars_html(characters, image_location=path.join("app", "static"), write_character=False, server_mode=False):
     """
     Grabs the HTML for each of the characters in a list of characters
 
     :param  list characters: A list of the characters you want to grab
     :param str image_location: Used to optionally control where the image is written to
     :param bool server_mode: Used to determine whether this was called by a running web server or not
+    :param write_character: Used to determine whether individual characters should be written to output
     :return: Returns a webpgae with all the character data rendered
     :rtype: str
     """
@@ -74,18 +75,19 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
                     or ("simplified" not in organized_entry and organized_entry["traditional"] not in characters_file_contents)\
                     or has_duplicates:
 
-                with open("character_searches.txt", "a+", encoding="utf-8-sig") as character_searches:
-                    if "has_duplicates" in organized_entry:
-                        has_duplicates = True
+                if write_character:
+                    with open("character_searches.txt", "a+", encoding="utf-8-sig") as character_searches:
+                        if "has_duplicates" in organized_entry:
+                            has_duplicates = True
 
-                    if "simplified" in organized_entry:
-                        character_searches.write(
-                            organized_entry["traditional"] + "/" + organized_entry["simplified"] + " \\ " +
-                            organized_entry["pinyin_text"] + " \\ " + organized_entry["defs_text"] + "\n")
-                    else:
-                        character_searches.write(
-                            organized_entry["traditional"] + " \\ " + organized_entry["pinyin_text"] + " \\ "
-                            + organized_entry["defs_text"] + "\n")
+                        if "simplified" in organized_entry:
+                            character_searches.write(
+                                organized_entry["traditional"] + "/" + organized_entry["simplified"] + " \\ " +
+                                organized_entry["pinyin_text"] + " \\ " + organized_entry["defs_text"] + "\n")
+                        else:
+                            character_searches.write(
+                                organized_entry["traditional"] + " \\ " + organized_entry["pinyin_text"] + " \\ "
+                                + organized_entry["defs_text"] + "\n")
 
             env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
             if server_mode:
