@@ -11,8 +11,10 @@ def _lookup_character():
     webpage = ""
 
     input_text = request.args.get('character_to_lookup').strip()
-    save_character_checked = request.args.get('save_character')
-    print(save_character_checked)
+    if request.args.get('save_character') == "true":
+        save_character_checked = True
+    else:
+        save_character_checked = False
 
     word, chars = get_words([input_text], app.config["ebook"], select_first=True)
 

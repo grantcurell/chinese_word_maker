@@ -28,7 +28,8 @@ $(document).ready(function(){
 
   $("#{{ form.save_character_checkbox.form_name }}").change(function() {
 
-
+     cb = $(this);
+     cb.val(cb.prop('checked'));
 
   });
 
@@ -53,7 +54,7 @@ $(document).ready(function(){
         </div>
           <form id='{{ form.save_character_checkbox.form_name }}' role=form>
           <div class="form-check">
-            <input class="form-check-input {{ form.save_character_checkbox.css_class }}" type="checkbox" value="" id="{{ form.save_character_checkbox.form_name }}">
+            <input class="form-check-input {{ form.save_character_checkbox.css_class }}" type="checkbox" value="" id="{{ form.save_character_checkbox.checkbox_id }}">
             <label class="form-check-label" for="{{ form.save_character_checkbox.form_name }}">
               {{ form.save_character_checkbox.label }}
             </label>
