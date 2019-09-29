@@ -1,7 +1,7 @@
 from flask import render_template, request
 from app import app
-from app.forms import CharacterForm
-from os import path
+from app.forms import CharacterForm, GenerateFlashcardsForm
+from os import path, system
 from chinese_tarjetas.chinese_tarjetas import get_words,get_chars_html
 
 
@@ -48,6 +48,21 @@ def _lookup_character():
 
     else:
         return 'We could not find that character in the book!'
+
+@app.route('/_generate')
+def _generate():
+    type = request.args.get('type').strip()
+
+    if type == "characters":
+        system('make character')
+
+    return "True"
+
+
+@app.route('/generate_flashcards')
+def generate_flashcards():
+    form = GenerateFlashcardsForm()
+    return render_template('generate_flashcards.html', title='Generate Flashcards', form=form)
 
 
 @app.route('/', methods=['GET', 'POST'])

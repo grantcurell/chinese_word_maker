@@ -33,3 +33,7 @@ tarjetaui/__pycache__/
 *.jpg
 
 *.pyc
+
+character_searches_clean
+
+*.swp

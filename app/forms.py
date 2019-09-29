@@ -218,7 +218,8 @@ class CharacterForm:
     # If you need to add elements to the navbar you can do it here
     navbar_elements = OrderedDict([
         ('Character Lookup', {'url': '/character', 'key': 'tn_character'})
-        , ('Help', {'url': '/help', 'key': 'tn_help'})])
+        , ('Help', {'url': '/help', 'key': 'tn_help'})
+        , ('Generate Flashcards', {'url': '/generate_flashcards', 'key': "tn_generate_flashcards"})])
 
     character = Button(
         form_name='character_input'
@@ -237,3 +238,21 @@ class CharacterForm:
         "Use this to control whether to save this character in the list of characters to learn.")
 
     dhcp_settings = [character, save_character_checkbox]
+
+
+class GenerateFlashcardsForm:
+
+    navbar_elements = OrderedDict([
+        ('Character Lookup', {'url': '/character', 'key': 'tn_character'})
+        , ('Help', {'url': '/help', 'key': 'tn_help'})
+        , ('Generate Flashcards', {'url': '/generate_flashcards', 'key': "tn_generate_flashcards"})])
+
+    generate_words_button = GenericButton(
+        form_name='generate_words'
+        , label='Generate Words'
+    )
+
+    generate_characters_button = GenericButton(
+        form_name='generate_characters'
+        , label='Generate Characters'
+    )

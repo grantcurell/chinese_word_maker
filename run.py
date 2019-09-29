@@ -9,6 +9,7 @@ from chinese_tarjetas.chinese_tarjetas import *
 from argparse import ArgumentParser
 from pathlib import Path
 from app import app
+import platform
 
 
 def main():
@@ -44,7 +45,7 @@ def main():
                         help='If this option is passed the program will try to write to Anki\'s media folder directly.'
                              ' If you pass this argument, you must also pass your Anki username.')
     parser.add_argument('--anki-username', metavar='ANKI_USERNAME', dest="anki_username", required=False, type=str,
-                        help='Your Anki username.')
+                        default="User 1", help='Your Anki username.')
     parser.add_argument('--run-server', dest="run_server", required=False, action='store_true', default=False,
                         help='Instead of writing out flashcards, we will start a flask server where you can query '
                              'for characters. This will supersede all other arguments.')
@@ -76,8 +77,12 @@ def main():
 
     if args.use_media_folder:
         if args.anki_username:
-            args.chars_image_folder = os.path.join(os.getenv("APPDATA"), "Anki2", args.anki_username,
-                                                   "collection.media")
+            if 'Windows' in platform.system():
+                args.chars_image_folder = os.path.join(os.getenv("APPDATA"), "Anki2", args.anki_username,
+                                                       "collection.media")
+            else:
+                args.chars_image_folder = os.path.expanduser("~") + '/.local/share/Anki2/' + args.anki_username + \
+                                          '/collection.media'
         else:
             logging.critical("If you want to write directly to Anki's media folder you must provide your username!")
             exit(0)
