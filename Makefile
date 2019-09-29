@@ -18,3 +18,6 @@ character:
 	python3 run.py --file character_searches_clean --ebook-path ./chinese_tarjetas/combined.epub --delimiter \ --use-media-folder --anki-username "User 1"
 	cp -f character_searches.txt /tmp/character_searches_backup.txt
 	rm -f character_searches.txt character_searches_clean
+
+run-server:
+	python3 run.py --run-server --ebook-path ./chinese_tarjetas/combined.epub
