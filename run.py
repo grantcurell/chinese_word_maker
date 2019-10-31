@@ -75,6 +75,7 @@ def main():
         print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
         exit(0)
 
+    # Change path depending on whether we are on Windows or Linux
     if args.use_media_folder:
         if args.anki_username:
             if 'Windows' in platform.system():
