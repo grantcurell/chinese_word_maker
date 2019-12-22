@@ -8,8 +8,8 @@ import os
 import ntpath
 import sys
 import re
-from datetime import datetime
 import jinja2
+import requests
 from ntpath import basename
 from os import path
 
@@ -34,14 +34,46 @@ def create_image_name(organized_entry, image_location=""):
         return file_name + "-" + organized_entry["pinyin_text"] + '.' + file_extension
 
 
+def get_examples_html(word):
+
+    # We use the big5 encoding type because this website specifically uses traditional characters.
+    params = {'inputword': word["traditional"].encode(encoding="big5", errors="strict"), "selectAB": "AAB", "inputpos": "", "selectFeature": ""}
+    r = requests.post("http://asbc.iis.sinica.edu.tw/process.asp", data=params)
+
+    bs = BeautifulSoup(r.content.decode('big5', errors="replace"), features="lxml")
+
+    # Remove the click elements that are usually on the sides of the results
+    for tag in bs.select('u'):
+        tag.decompose()
+
+    # Get the results table specifically
+    table = bs.find(lambda tag: tag.name == 'table' and tag.has_attr('width') and tag['width'] == "100%")
+
+    results = []
+    for element in table.findAll(lambda tag: tag.name == 'tr'):
+        element_text = ""
+        for text in element.findAll(text=True, recursive=True):
+            if text != '\n':
+                element_text += text
+
+        if element_text != "":
+            logging.debug(element_text)
+            results.append(element_text)
+
+    env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
+    template = env.get_template("examples.html")
+
+    return template.render(results=results)
+
+
 def get_chars_html(characters, image_location=path.join("app", "static"), write_character=False, server_mode=False):
     """
-    Grabs the HTML for each of the characters in a list of characters
+    Grabs the HTML for each of the characters in a list of characters. This is used for generating the web pages.
 
     :param  list characters: A list of the characters you want to grab
     :param str image_location: Used to optionally control where the image is written to
+    :param write_character: Used to determine whether individual characters should be written to output file
     :param bool server_mode: Used to determine whether this was called by a running web server or not
-    :param write_character: Used to determine whether individual characters should be written to output
     :return: Returns a webpgae with all the character data rendered
     :rtype: str
     """
@@ -139,7 +171,7 @@ def query_yes_no(question, default="yes"):
 
 def _get_word_line(word, delimiter):
     """
-    Gets the string used for outputting words
+    Gets the string used for outputting words to Anki format
 
     :param dict word: The word you want to output
     :param str delimiter: The delimiter you want to use in the output

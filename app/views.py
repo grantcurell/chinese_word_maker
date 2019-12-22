@@ -2,7 +2,7 @@ from flask import render_template, request
 from app import app
 from app.forms import CharacterForm, GenerateFlashcardsForm
 from os import path, system
-from chinese_tarjetas.chinese_tarjetas import get_words,get_chars_html
+from chinese_tarjetas.chinese_tarjetas import get_words, get_chars_html, get_examples_html
 
 
 @app.route('/_lookup_character')
@@ -26,6 +26,7 @@ def _lookup_character():
 
         webpage += render_template('word.html', word=word[0]) + "<hr>"
         webpage += get_chars_html(word[0]["characters"], write_character=save_character_checked, server_mode=True)
+        webpage += get_examples_html(word[0])
 
         if not path.exists('word_searches.txt'):
             with open('word_searches.txt', 'w'): pass
@@ -34,7 +35,8 @@ def _lookup_character():
             word_file_contents = file.read()
 
             if (not word[0]["simplified"] and word[0]["traditional"] not in word_file_contents) or \
-                (word[0]["traditional"] not in word_file_contents and word[0]["simplified"] not in word_file_contents):
+                    (word[0]["traditional"] not in word_file_contents and word[0]["simplified"]
+                     not in word_file_contents):
 
                 with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
                     if "simplified" in word[0]:
