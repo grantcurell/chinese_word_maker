@@ -1,3 +1,4 @@
+from concurrent.futures.thread import ThreadPoolExecutor
 from urllib.request import urlopen
 from urllib.parse import quote
 from bs4 import BeautifulSoup
@@ -5,6 +6,7 @@ from ntpath import basename
 from os import path
 from hanziconv import HanziConv
 from googletrans import Translator
+import concurrent.futures
 import ebooklib
 import traceback
 import logging
@@ -37,9 +39,18 @@ def create_image_name(organized_entry, image_location=""):
 
 
 def get_examples_html(word):
+    """
+    Reach out to http://asbc.iis.sinica.edu.tw/ and get example sentences.
+
+    :param str word: The word, in traditional character format, for which you want to retrieve examples
+    :return Returns a template string with all of the examples formatted within it.
+    :rtype str
+    """
+    logging.info("Creating an example for " + word)
 
     # We use the big5 encoding type because this website specifically uses traditional characters.
-    params = {'inputword': word["traditional"].encode(encoding="big5", errors="strict"), "selectAB": "AAB", "inputpos": "", "selectFeature": ""}
+    params = {'inputword': word.encode(encoding="big5", errors="strict"), "selectAB": "AAB",
+              "inputpos": "", "selectFeature": ""}
     r = requests.post("http://asbc.iis.sinica.edu.tw/process.asp", data=params)
 
     bs = BeautifulSoup(r.content.decode('big5', errors="replace"), features="lxml")
@@ -50,6 +61,10 @@ def get_examples_html(word):
 
     # Get the results table specifically
     table = bs.find(lambda tag: tag.name == 'table' and tag.has_attr('width') and tag['width'] == "100%")
+
+    if table is None:
+        logging.info("No examples found for " + word)
+        return "No examples found for " + word
 
     results = []
     i = 0
@@ -69,7 +84,7 @@ def get_examples_html(word):
             logging.debug(element_text)
 
             # element_text is in Traditional Chinese, we want to get the simplified and display both
-            results.append([element_text, HanziConv.toSimplified(element_text)]) #, pinyin.get(element_text)])
+            results.append([element_text, HanziConv.toSimplified(element_text)])
 
             i = i + 1
 
@@ -78,12 +93,17 @@ def get_examples_html(word):
 
     # This grabs the first element of every result which in our case is just the original traditional Chinese text
     for text_to_translate in [item[0] for item in results]:
-        translation = translator.translate(text_to_translate, src='zh-TW', dest='en')
+        try:
+            translation = translator.translate(text_to_translate, src='zh-TW', dest='en')
+        except:
+            logging.critical("You got an exception while trying to translate something via Google. "
+                             "You probably got banned.")
+            exit(1)
 
         # I'm not sure why but the Python library's pronunciation value doesn't work. Howevere, if you go digging
         # through the translation object you can find there is actually a return for the pinyin. It's just always
-        # the last item of the translation key in extra data. The last item is a list and the last element of the list
-        # is always the pinyin pronunciation word separated.
+        # the last item of the translation key in extra data. The last item is a list and the last element of the
+        # list is always the pinyin pronunciation word separated.
         results[i].append(translation.extra_data["translation"][-1][-1])
         results[i].append(translation.text)
         i = i + 1
@@ -327,7 +347,7 @@ def output_characters(chars_output_file_name, char_images_folder, char_list, del
                 logging.info("Writing the character: " + character["traditional"])
 
 
-def output_combined(output_file_name, char_images_folder, word_list, delimiter):
+def output_combined(output_file_name, char_images_folder, word_list, delimiter, thread_count):
     """
     Allows you to output flashcards with both the word and the character embedded in them.
 
@@ -335,10 +355,41 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter):
     :param str char_images_folder: The folder which will store the images associated with the character images
     :param list word_list: The list of words we want to write to file
     :param str delimiter: The delimiter you want to use for your flashcards
+    :param int thread_count: The number of threads that will be used to pull examples
     :return: Returns nothing
     """
 
     with open(output_file_name, 'w', encoding="utf-8-sig") as output_file:
+
+        examples = {}
+
+        logging.info("Launching threads to get example text.")
+
+        # Here we use threading to launch multiple threads to get the examples at the same time so this doesn't take
+        # forever.
+        with ThreadPoolExecutor(max_workers=thread_count) as executor:
+            future_example = {executor.submit(get_examples_html, word["traditional"]): word for word in word_list}
+
+            length = str(len(word_list))
+            i = 1
+
+            for future in concurrent.futures.as_completed(future_example):
+                word_processed = future_example[future]
+                logging.info("We have processed " + str(i) + " of " + length + " examples.")
+                try:
+                    if word_processed is not None:
+                        examples[word_processed["traditional"]] = future.result()
+                    else:
+                        logging.info("No examples found for word: " + word_processed["traditional"])
+                except Exception as exc:
+                    logging.error('%r generated an exception: %s' % (word_processed["traditional"], exc))
+                else:
+                    logging.info('Finished processing word %s' % word_processed["traditional"])
+
+                i = i + 1
+
+        logging.info("Finished getting all examples.")
+
         for word in word_list:
 
             output_file.write(_get_word_line(word, delimiter) + delimiter)
@@ -347,7 +398,11 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter):
 
             output_file.write(line.replace(delimiter, ""))
 
-            line = get_examples_html(word["traditional"]).replace('\n', "") + "\n"
+            try:
+                line = examples[word["traditional"]].replace('\n', "") + "\n"
+            except KeyError:
+                logging.debug("No examples found for word: " + word["traditional"])
+            i = i + 1
 
             output_file.write(line.replace(delimiter, ""))
 
@@ -370,7 +425,14 @@ def get_words(words, ebook=None, skip_choices=False, select_first=False):
 
     if ebook:
 
+        length = str(len(words))
+        i = 1
+
         for word in words:
+
+            logging.info("Processing word " + str(i) + " of " + length)
+            i = i + 1
+
             try:
                 word = word.strip()  # type: str
 

@@ -51,6 +51,8 @@ def main():
                              'for characters. This will supersede all other arguments.')
     parser.add_argument('--port', dest="port", required=False, type=int, default=5000,
                         help='Specify the port you want Flask to run on')
+    parser.add_argument('--thread-count', dest="thread_count", required=False, type=int, default=5,
+                        help='Specify the number of worker threads with which you want to grab examples.')
     parser.add_argument('--create-combined', dest="combined_output", required=False, action='store_true',
                         help='Set this option if you want to create flashcards with combined character mnemonics and'
                              ' words in a single output.')
@@ -67,10 +69,10 @@ def main():
 
     if args.print_usage:
         print('\nCreate combined cards:')
-        print('python run.py --file backup.txt --ebook-path .\chinese_tarjetas\combined.epub --delimiter \ --use-media-folder --anki-username "User 1" --create-combined')
+        print('python run.py --file word_searches.txt --ebook-path .\chinese_tarjetas\combined.epub --delimiter \ --use-media-folder --anki-username "User 1" --create-combined')
         print('\nVisual Studio Code regex for excluding lines starting with asterisk: ^(?!\*).*\\n')
         print('\nCreate character cards:')
-        print('python run.py --file backup.txt --ebook-path .\chinese_tarjetas\combined.epub --delimiter \ --use-media-folder --anki-username "User 1"')
+        print('python run.py --file character_searches.txt --ebook-path .\chinese_tarjetas\combined.epub --delimiter \ --use-media-folder --anki-username "User 1"')
         print('\nMapping for "Chinse Words Updated" is:')
         print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
         exit(0)
@@ -126,7 +128,8 @@ def main():
         words, characters = get_words(args.single_word, app.config["ebook"], args.skip_choices)
 
         if args.combined_output:
-            output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter)
+            output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
+                            thread_count=args.thread_count)
         else:
             if words:
                 output_words(args.words_output_file_name, words, args.delimiter)
@@ -143,7 +146,8 @@ def main():
                 words, characters = get_words(words, app.config["ebook"], args.skip_choices)
 
                 if args.combined_output:
-                    output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter)
+                    output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
+                                    args.thread_count)
                 else:
                     if words:
                         output_words(args.words_output_file_name, words, args.delimiter)

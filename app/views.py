@@ -26,7 +26,7 @@ def _lookup_character():
 
         webpage += render_template('word.html', word=word[0]) + "<hr>"
         webpage += get_chars_html(word[0]["characters"], write_character=save_character_checked, server_mode=True)
-        webpage += get_examples_html(word[0])
+        webpage += get_examples_html(word[0]["traditional"])
 
         if not path.exists('word_searches.txt'):
             with open('word_searches.txt', 'w'):
