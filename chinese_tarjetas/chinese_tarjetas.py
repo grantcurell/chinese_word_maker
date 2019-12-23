@@ -14,7 +14,6 @@ import sys
 import re
 import jinja2
 import requests
-import pinyin
 
 
 def create_image_name(organized_entry, image_location=""):
@@ -70,7 +69,7 @@ def get_examples_html(word):
             logging.debug(element_text)
 
             # element_text is in Traditional Chinese, we want to get the simplified and display both
-            results.append([element_text, HanziConv.toSimplified(element_text), pinyin.get(element_text)])
+            results.append([element_text, HanziConv.toSimplified(element_text)]) #, pinyin.get(element_text)])
 
             i = i + 1
 
@@ -79,7 +78,14 @@ def get_examples_html(word):
 
     # This grabs the first element of every result which in our case is just the original traditional Chinese text
     for text_to_translate in [item[0] for item in results]:
-        results[i].append(translator.translate(text_to_translate, src='zh-TW', dest='en').text)
+        translation = translator.translate(text_to_translate, src='zh-TW', dest='en')
+
+        # I'm not sure why but the Python library's pronunciation value doesn't work. Howevere, if you go digging
+        # through the translation object you can find there is actually a return for the pinyin. It's just always
+        # the last item of the translation key in extra data. The last item is a list and the last element of the list
+        # is always the pinyin pronunciation word separated.
+        results[i].append(translation.extra_data["translation"][-1][-1])
+        results[i].append(translation.text)
         i = i + 1
 
     env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
