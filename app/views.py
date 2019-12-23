@@ -29,7 +29,8 @@ def _lookup_character():
         webpage += get_examples_html(word[0])
 
         if not path.exists('word_searches.txt'):
-            with open('word_searches.txt', 'w'): pass
+            with open('word_searches.txt', 'w'):
+                pass
 
         with open("word_searches.txt", "r", encoding="utf-8-sig") as file:
             word_file_contents = file.read()
@@ -50,6 +51,7 @@ def _lookup_character():
 
     else:
         return 'We could not find that character in the book!'
+
 
 @app.route('/_generate')
 def _generate():

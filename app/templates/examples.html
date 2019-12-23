@@ -1,18 +1,46 @@
-  <Center>
+<style>
+    .hanzi_style {
+        font-family: "Microsoft YaHei";
+        font-size: 1.0em;
+        line-height: 1.1
+    }
+
+    .blank_row
+    {
+        height: 10px !important; /* overwrites any other rules */
+        background-color: #FFFFFF;
+    }
+
+    table_center {
+        margin-left:auto;
+        margin-right:auto;
+    }
+</style>
+
+<Center>
     <FONT COLOR=Red size="5" face="標楷體"><strong>查詢結果</strong></FONT>
-  </Center>
+</Center>
 
-  <div align='center'><table width='300' border='1'><tr><td>社會</td></tr><tr><td>10</td></tr></table></div>
+<p>共有<FONT COLOR=#FF0000 style="font-family:KaiTi"> {{ results | length | string }} </FONT>筆資料 </p>
 
-		<p>共有<FONT COLOR=#FF0000> 10 </FONT>筆資料 </p>
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
 
-		<table width="100%" border="0" cellpadding="0" cellspacing="0">
+{% for result in results %}
+    <tr>
+        <td class="hanzi_style table_center">{{ result[0] }}</td>
+    </tr>
+    <tr>
+        <td class="hanzi_style table_center">{{ result[1] }}</td>
+    </tr>
+    <tr>
+        <td class="hanzi_style table_center">{{ result[2] }}</td>
+    </tr>
+    <tr>
+        <td class="hanzi_style table_center">{{ result[3] }}</td>
+    </tr>
+    <tr class="blank_row">
+        <td colspan="3"></td>
+    </tr>
+{% endfor %}
 
-        {% for result in results %}
-            <tr>
-                <td>{{ result }}</td>
-            </tr>
-        {% endfor %}
-
-        </table>
-	<br>
+</table>

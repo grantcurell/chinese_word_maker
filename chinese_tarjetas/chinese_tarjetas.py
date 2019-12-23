@@ -1,6 +1,10 @@
 from urllib.request import urlopen
 from urllib.parse import quote
 from bs4 import BeautifulSoup
+from ntpath import basename
+from os import path
+from hanziconv import HanziConv
+from googletrans import Translator
 import ebooklib
 import traceback
 import logging
@@ -10,8 +14,7 @@ import sys
 import re
 import jinja2
 import requests
-from ntpath import basename
-from os import path
+import pinyin
 
 
 def create_image_name(organized_entry, image_location=""):
@@ -50,7 +53,14 @@ def get_examples_html(word):
     table = bs.find(lambda tag: tag.name == 'table' and tag.has_attr('width') and tag['width'] == "100%")
 
     results = []
+    i = 0
     for element in table.findAll(lambda tag: tag.name == 'tr'):
+
+        # This is a magic number. I decided I didn't want to get more than 10 results because it's unlikely to be
+        # useful.
+        if i > 5:
+            break
+
         element_text = ""
         for text in element.findAll(text=True, recursive=True):
             if text != '\n':
@@ -58,7 +68,19 @@ def get_examples_html(word):
 
         if element_text != "":
             logging.debug(element_text)
-            results.append(element_text)
+
+            # element_text is in Traditional Chinese, we want to get the simplified and display both
+            results.append([element_text, HanziConv.toSimplified(element_text), pinyin.get(element_text)])
+
+            i = i + 1
+
+    translator = Translator()
+    i = 0
+
+    # This grabs the first element of every result which in our case is just the original traditional Chinese text
+    for text_to_translate in [item[0] for item in results]:
+        results[i].append(translator.translate(text_to_translate, src='zh-TW', dest='en').text)
+        i = i + 1
 
     env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
     template = env.get_template("examples.html")
@@ -315,7 +337,11 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter):
 
             output_file.write(_get_word_line(word, delimiter) + delimiter)
 
-            line = get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "") + "\n"
+            line = get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "")
+
+            output_file.write(line.replace(delimiter, ""))
+
+            line = get_examples_html(word["traditional"]).replace('\n', "") + "\n"
 
             output_file.write(line.replace(delimiter, ""))
 
