@@ -303,7 +303,7 @@ def _get_character_line(character, image_file_name, delimiter):
         "<img src=\"" + image_file_name + "\" />" + delimiter + \
         character_cleaned["mnemonics"] + delimiter + \
         character_cleaned["story"] + delimiter + \
-        character_cleaned["examples"] + delimiter + \
+        character_cleaned["examples"] + "<hr>" + get_examples_html(character_cleaned["traditional"]) + delimiter + \
         character_cleaned["additionalinfo"] + delimiter + \
         character_cleaned["simplifiedcomponents"] + delimiter + \
         character_cleaned["traditionalcomponents"]
