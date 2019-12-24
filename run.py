@@ -25,8 +25,7 @@ def main():
                         required=False, default="chars_list.txt",
                         help='By default this is chars_list.txt. You may change it by providing this argument.')
     parser.add_argument('--chars-image-folder', metavar='CHARS-IMAGE-FOLDER', dest="chars_image_folder", type=str,
-                        required=False, default=os.path.join(os.getenv("APPDATA"), "Anki2", "User 1",
-                                                             "collection.media"),
+                        required=False, default=None,
                         help='By default creates a folder called char_images in the current directory to store the '
                              'images associated with character images.')
     parser.add_argument('--skip-choices', dest="skip_choices", required=False, action='store_true', default=False,
@@ -79,7 +78,7 @@ def main():
         exit(0)
 
     # Change path depending on whether we are on Windows or Linux
-    if args.use_media_folder:
+    if args.use_media_folder or args.chars_image_folder is None:
         if args.anki_username:
             if 'Windows' in platform.system():
                 args.chars_image_folder = os.path.join(os.getenv("APPDATA"), "Anki2", args.anki_username,
