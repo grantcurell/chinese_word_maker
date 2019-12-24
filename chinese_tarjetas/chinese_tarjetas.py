@@ -469,6 +469,7 @@ def get_words(words, ebook=None, skip_choices=False, select_closest_match=False)
             except AttributeError:
                 logging.error("It looks like we've caught an attribute error. Maybe there's an invalid character "
                               "in the input?")
+                return None
             # Because you could spend a lot of time working on this we want to avoid program termination at all costs
             # Because of this we catch all exceptions and provide the option to continue or not.
             except:
