@@ -585,9 +585,9 @@ def process_word(word, skip_choices=False, ebook=None, select_closest_match=Fals
     for entry in results:
         entries.append(process_word_entry(entry, ebook))
 
-    if len(entries) > 1 and skip_choices is not True:
+    if len(entries) > 1:
 
-        if select_closest_match:
+        if select_closest_match or skip_choices:
             # We use the simplified to avoid the one to many problem.
             simplified_word = HanziConv.toSimplified(word)
 

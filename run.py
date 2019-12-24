@@ -29,8 +29,7 @@ def main():
                         help='By default creates a folder called char_images in the current directory to store the '
                              'images associated with character images.')
     parser.add_argument('--skip-choices', dest="skip_choices", required=False, action='store_true', default=False,
-                        help='This option will skip all choices and ignore the words for which a choice would have '
-                             'been made.')
+                        help='This option will tell the program to just select the closest match for the word.')
     parser.add_argument('--ebook-path', metavar='EBOOK_PATH', dest="ebook_path", required=False, type=str,
                         default="combined.epub", help='A path to Chinese Blockbuster in EPUB format. In my case, I '
                                                       'bought all of them and merged them into one big book.')
