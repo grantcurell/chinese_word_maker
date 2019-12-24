@@ -20,4 +20,4 @@ character:
 	rm -f character_searches.txt character_searches_clean
 
 server:
-	python3 run.py --run-server --create-combined
+	python3 run.py --run-server --create-combined --chars-image-folder ./char_images/
