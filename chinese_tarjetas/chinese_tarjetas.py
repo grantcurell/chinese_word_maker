@@ -409,11 +409,11 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
 
 def output_combined_online(word, output_file_name, delimiter, char_line, example_line):
 
-    with open(output_file_name, 'w', encoding="utf-8-sig") as output_file:
+    with open(output_file_name, 'a+', encoding="utf-8-sig") as output_file:
 
         output_file.write(_get_word_line(word, delimiter) + delimiter)
         output_file.write(char_line.replace('\n', "").replace(delimiter, ""))
-        output_file.write((example_line + "\n").replace(delimiter, ""))
+        output_file.write((example_line.replace('\n', "") + "\n").replace(delimiter, ""))
 
 
 def get_words(words, ebook=None, skip_choices=False, select_first=False):

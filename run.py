@@ -32,9 +32,9 @@ def main():
     parser.add_argument('--skip-choices', dest="skip_choices", required=False, action='store_true', default=False,
                         help='This option will skip all choices and ignore the words for which a choice would have '
                              'been made.')
-    parser.add_argument('--ebook-path', metavar='EBOOK_PATH', dest="ebook_path", required=False, type=str, default=None,
-                        help='A path to Chinese Blockbuster in EPUB format. In my case, I bought all of them and merged'
-                             ' them into one big book.')
+    parser.add_argument('--ebook-path', metavar='EBOOK_PATH', dest="ebook_path", required=False, type=str,
+                        default="combined.epub", help='A path to Chinese Blockbuster in EPUB format. In my case, I '
+                                                      'bought all of them and merged them into one big book.')
     parser.add_argument('--log-level', metavar='LOG_LEVEL', dest="log_level", required=False, type=str, default="info",
                         choices=['debug', 'info', 'warning', 'error', 'critical'],
                         help='A path to Chinese Blockbuster in EPUB format. In my case, I bought all of them and merged'
@@ -124,12 +124,9 @@ def main():
             app.config['OUTPUT_FILE'] = "word_searches_combined.txt"
             app.config['IMAGE_FOLDER'] = args.chars_image_folder
             app.config['DELIMITER'] = args.delimiter
-        if args.ebook_path:
-            app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-            app.run(host='0.0.0.0', port=args.port)
-        else:
-            print("You cannot start a server without providing a path of a character ebook!")
-            exit(0)
+
+        app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+        app.run(host='0.0.0.0', port=args.port)
     elif args.single_word:
 
         words, characters = get_words(args.single_word, app.config["ebook"], args.skip_choices)

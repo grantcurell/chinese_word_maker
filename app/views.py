@@ -1,8 +1,7 @@
-import concurrent
 import logging
 from concurrent.futures.thread import ThreadPoolExecutor
-from time import sleep
 from flask import render_template, request
+from hanziconv import HanziConv
 from app import app
 from app.forms import CharacterForm, GenerateFlashcardsForm
 from os import path, system
@@ -21,13 +20,22 @@ def _lookup_character():
         save_character_checked = False
 
     input_word = input_text.split(' ')[0]
+    input_word_traditional = HanziConv.toTraditional(input_word)
 
     executor = ThreadPoolExecutor(max_workers=4)
 
     get_words_future = executor.submit(get_words, [input_word], app.config["ebook"], select_first=True)
-    example_future = executor.submit(get_examples_html, input_word)
+    example_future = executor.submit(get_examples_html, input_word_traditional)
 
     word, chars = get_words_future.result()
+
+    # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen relatively
+    # infrequently so we should still get a net time save.
+    if input_word_traditional != word[0]["traditional"]:
+        logging.warning("We used some heuristics to convert from Simplified to Traditional Chinese. It looks like on "
+                        "further evaluation they failed. This is not fatal and will be automatically fixed, but we must"
+                        " make a new web request which will take a few seconds.")
+        example_future = executor.submit(get_examples_html, word["traditional"])
 
     if chars is not None:
 
@@ -35,19 +43,18 @@ def _lookup_character():
 
     elif word is not None:
 
-        word_future = executor.submit(render_template, 'word.html', word=input_word)
-
         char_future_server = executor.submit(get_chars_html, word[0]["characters"],
                                              write_character=save_character_checked, server_mode=True)
         char_future = executor.submit(get_chars_html, word[0]["characters"], image_location=app.config['IMAGE_FOLDER'],
                                       write_character=save_character_checked, server_mode=False)
 
-        webpage += word_future.result() + "<hr>"
+        webpage += render_template("word.html", word=word[0]) + "<hr>"
         webpage += char_future_server.result()
         webpage += example_future.result()
 
-        if app.config["COMBINED_OUTPUT"]:
-            output_combined_online(word, app.config['OUTPUT_FILE'], app.config['DELIMITER'], char_future.result())
+        if app.config["CREATE_COMBINED"]:
+            output_combined_online(word[0], app.config['OUTPUT_FILE'], app.config['DELIMITER'], char_future.result(),
+                                   example_future.result())
         else:
             if not path.exists('word_searches.txt'):
                 with open('word_searches.txt', 'w'):
