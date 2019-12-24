@@ -466,6 +466,9 @@ def get_words(words, ebook=None, skip_choices=False, select_closest_match=False)
             except KeyboardInterrupt:
                 if not query_yes_no("You have pressed ctrl+C. Are you sure you want to exit?"):
                     exit(0)
+            except AttributeError:
+                logging.error("It looks like we've caught an attribute error. Maybe there's an invalid character "
+                              "in the input?")
             # Because you could spend a lot of time working on this we want to avoid program termination at all costs
             # Because of this we catch all exceptions and provide the option to continue or not.
             except:
