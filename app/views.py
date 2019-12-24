@@ -47,8 +47,7 @@ def _lookup_character():
         webpage += example_future.result()
 
         if app.config["COMBINED_OUTPUT"]:
-            output_combined_online(word, app.config['OUTPUT_FILE'], app.config['IMAGE_FOLDER'], app.config['DELIMITER'],
-                                   char_future.result())
+            output_combined_online(word, app.config['OUTPUT_FILE'], app.config['DELIMITER'], char_future.result())
         else:
             if not path.exists('word_searches.txt'):
                 with open('word_searches.txt', 'w'):

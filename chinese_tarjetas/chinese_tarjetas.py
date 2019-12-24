@@ -407,23 +407,13 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
             output_file.write(line.replace(delimiter, ""))
 
 
-def output_combined_online(word, output_file_name, char_images_folder, delimiter, char_line):
+def output_combined_online(word, output_file_name, delimiter, char_line, example_line):
 
     with open(output_file_name, 'w', encoding="utf-8-sig") as output_file:
 
         output_file.write(_get_word_line(word, delimiter) + delimiter)
-
-        line = get_chars_html(word["characters"], image_location=char_images_folder).replace('\n', "")
-
-        output_file.write(line.replace(delimiter, ""))
-
-        try:
-            line = examples[word["traditional"]].replace('\n', "") + "\n"
-        except KeyError:
-            logging.debug("No examples found for word: " + word["traditional"])
-        i = i + 1
-
-        output_file.write(line.replace(delimiter, ""))
+        output_file.write(char_line.replace('\n', "").replace(delimiter, ""))
+        output_file.write((example_line + "\n").replace(delimiter, ""))
 
 
 def get_words(words, ebook=None, skip_choices=False, select_first=False):
