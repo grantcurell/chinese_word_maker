@@ -582,35 +582,49 @@ def process_word(word, skip_choices=False, ebook=None, select_closest_match=Fals
         entries.append(process_word_entry(entry, ebook))
 
     if len(entries) > 1 and skip_choices is not True:
-        print("It looks like there are multiple definitions for this word available. "
-              "Which one would you like to use?")
-
-        print("\n\n-------- Option 0 ---------\n")
-        print("Type 0 to skip.")
-
-        for index, entry in enumerate(entries):
-            print("\n-------- Option " + str(index + 1) + "---------\n")
-            print(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
-
-        print("\n\n")
-        selection = -1  # type: int
 
         if select_closest_match:
             # We use the simplified to avoid the one to many problem.
             simplified_word = HanziConv.toSimplified(word)
 
             selection = 1
+            exact_match = False
+
+            logging.info(str(len(entries)) + " found from mdbg.net. Finding the closest match.")
+            for index, entry in enumerate(entries):
+                logging.info("\n-------- Option " + str(index + 1) + "---------\n")
+                logging.info(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
 
             for index, entry in enumerate(entries):
                 if entry["simplified"].strip() != "":
                     if entry["simplified"] == simplified_word:
                         selection = index + 1
+                        logging.info("Found exact match. Selecting " + entry["simplified"])
+                        exact_match = True
                         break
                 elif entry["traditional"] == simplified_word:
                     selection = index + 1
+                    logging.info("Found exact match. Selecting " + entry["traditional"])
+                    exact_match = True
                     break
 
+            if not exact_match:
+                logging.info("Did not find an exact match. Selecting first entry.")
+
         else:
+            print("It looks like there are multiple definitions for this word available. "
+                  "Which one would you like to use?")
+
+            print("\n\n-------- Option 0 ---------\n")
+            print("Type 0 to skip.")
+
+            for index, entry in enumerate(entries):
+                print("\n-------- Option " + str(index + 1) + "---------\n")
+                print(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
+
+            print("\n\n")
+            selection = -1  # type: int
+
             while (selection > len(entries) or selection < 1) and selection != 0:
                 selection = int(input("Enter your selection: "))
 
