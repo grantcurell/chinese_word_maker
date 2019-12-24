@@ -1,8 +1,12 @@
+import concurrent
+import logging
+from concurrent.futures.thread import ThreadPoolExecutor
+from time import sleep
 from flask import render_template, request
 from app import app
 from app.forms import CharacterForm, GenerateFlashcardsForm
 from os import path, system
-from chinese_tarjetas.chinese_tarjetas import get_words, get_chars_html, get_examples_html
+from chinese_tarjetas.chinese_tarjetas import get_words, get_chars_html, get_examples_html, output_combined_online
 
 
 @app.route('/_lookup_character')
@@ -16,7 +20,14 @@ def _lookup_character():
     else:
         save_character_checked = False
 
-    word, chars = get_words([input_text], app.config["ebook"], select_first=True)
+    input_word = input_text.split(' ')[0]
+
+    executor = ThreadPoolExecutor(max_workers=4)
+
+    get_words_future = executor.submit(get_words, [input_word], app.config["ebook"], select_first=True)
+    example_future = executor.submit(get_examples_html, input_word)
+
+    word, chars = get_words_future.result()
 
     if chars is not None:
 
@@ -24,28 +35,34 @@ def _lookup_character():
 
     elif word is not None:
 
-        webpage += render_template('word.html', word=word[0]) + "<hr>"
-        webpage += get_chars_html(word[0]["characters"], write_character=save_character_checked, server_mode=True)
-        webpage += get_examples_html(word[0]["traditional"])
+        word_future = executor.submit(render_template, 'word.html', word=input_word)
 
-        if not path.exists('word_searches.txt'):
-            with open('word_searches.txt', 'w'):
-                pass
+        char_future_server = executor.submit(get_chars_html, word[0]["characters"],
+                                             write_character=save_character_checked, server_mode=True)
+        char_future = executor.submit(get_chars_html, word[0]["characters"], image_location=app.config['IMAGE_FOLDER'],
+                                      write_character=save_character_checked, server_mode=False)
 
-        with open("word_searches.txt", "r", encoding="utf-8-sig") as file:
-            word_file_contents = file.read()
+        webpage += word_future.result() + "<hr>"
+        webpage += char_future_server.result()
+        webpage += example_future.result()
 
-            if (not word[0]["simplified"] and word[0]["traditional"] not in word_file_contents) or \
-                    (word[0]["traditional"] not in word_file_contents and word[0]["simplified"]
-                     not in word_file_contents):
+        if app.config["COMBINED_OUTPUT"]:
+            output_combined_online(word, app.config['OUTPUT_FILE'], app.config['IMAGE_FOLDER'], app.config['DELIMITER'],
+                                   char_future.result())
+        else:
+            if not path.exists('word_searches.txt'):
+                with open('word_searches.txt', 'w'):
+                    pass
 
-                with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
-                    if "simplified" in word[0]:
-                        word_file.write(
-                            word[0]["traditional"] + " / " + word[0]["simplified"] + " / " + word[0]["pinyin"] + " / "
-                            + ",".join(word[0]["defs"]) + "\n")
-                    else:
-                        word_file.write(word[0]["traditional"] + " / " + ",".join(word[0]["defs"]) + "\n")
+            with open("word_searches.txt", "r", encoding="utf-8-sig") as file:
+                word_file_contents = file.read()
+
+                if (not word[0]["simplified"] and word[0]["traditional"] not in word_file_contents) or \
+                        (word[0]["traditional"] not in word_file_contents and word[0]["simplified"]
+                         not in word_file_contents):
+
+                    with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
+                        word_file.write(word[0]["traditional"] + "\n")
 
         return webpage
 

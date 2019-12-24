@@ -25,7 +25,8 @@ def main():
                         required=False, default="chars_list.txt",
                         help='By default this is chars_list.txt. You may change it by providing this argument.')
     parser.add_argument('--chars-image-folder', metavar='CHARS-IMAGE-FOLDER', dest="chars_image_folder", type=str,
-                        required=False, default="char_images",
+                        required=False, default=os.path.join(os.getenv("APPDATA"), "Anki2", "User 1",
+                                                             "collection.media"),
                         help='By default creates a folder called char_images in the current directory to store the '
                              'images associated with character images.')
     parser.add_argument('--skip-choices', dest="skip_choices", required=False, action='store_true', default=False,
@@ -38,7 +39,7 @@ def main():
                         choices=['debug', 'info', 'warning', 'error', 'critical'],
                         help='A path to Chinese Blockbuster in EPUB format. In my case, I bought all of them and merged'
                              ' them into one big book.')
-    parser.add_argument('--delimiter', metavar='DELIMITER', dest="delimiter", required=False, type=str, default="~",
+    parser.add_argument('--delimiter', metavar='DELIMITER', dest="delimiter", required=False, type=str, default="\\",
                         help='Allows you to optionally select the delimiter you use for the delimiter in your Anki'
                              'cards. By default it is ~ which should avoid colliding with anything.')
     parser.add_argument('--use-media-folder', dest="use_media_folder", required=False, action='store_true',
@@ -117,6 +118,12 @@ def main():
         args.delimiter = args.delimiter.strip('\'').strip('\"')
 
     if args.run_server:
+        # This means the user would like to create the cards as the words are found.
+        if args.combined_output:
+            app.config['CREATE_COMBINED'] = True
+            app.config['OUTPUT_FILE'] = "word_searches_combined.txt"
+            app.config['IMAGE_FOLDER'] = args.chars_image_folder
+            app.config['DELIMITER'] = args.delimiter
         if args.ebook_path:
             app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
             app.run(host='0.0.0.0', port=args.port)
