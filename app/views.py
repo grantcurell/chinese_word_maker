@@ -45,6 +45,7 @@ def _lookup_character():
 
     elif word is not None:
 
+        logging.info("Performing character lookup for " + word[0]["traditional"])
         char_future_server = executor.submit(get_chars_html, word[0]["characters"],
                                              write_character=save_character_checked, server_mode=True)
         char_future = executor.submit(get_chars_html, word[0]["characters"], image_location=app.config['IMAGE_FOLDER'],
@@ -52,6 +53,8 @@ def _lookup_character():
 
         webpage += render_template("word.html", word=word[0]) + "<hr>"
         webpage += char_future_server.result()
+
+        logging.info("Waiting on example to return.")
         webpage += example_future.result()
 
         if app.config["CREATE_COMBINED"]:
