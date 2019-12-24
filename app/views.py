@@ -35,7 +35,7 @@ def _lookup_character():
         logging.warning("We used some heuristics to convert from Simplified to Traditional Chinese. It looks like on "
                         "further evaluation they failed. This is not fatal and will be automatically fixed, but we must"
                         " make a new web request which will take a few seconds.")
-        example_future = executor.submit(get_examples_html, word["traditional"])
+        example_future = executor.submit(get_examples_html, word[0]["traditional"])
 
     if chars is not None:
 
