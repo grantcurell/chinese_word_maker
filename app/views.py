@@ -31,7 +31,7 @@ def _lookup_character():
 
     # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen relatively
     # infrequently so we should still get a net time save.
-    if input_word_traditional != word[0]["traditional"]:
+    if input_word_traditional != word[0]["traditional"] and input_word != word[0]["traditional"]:
         logging.warning("We used some heuristics to convert from Simplified to Traditional Chinese. It looks like on "
                         "further evaluation they failed. This is not fatal and will be automatically fixed, but we must"
                         " make a new web request which will take a few seconds.")
