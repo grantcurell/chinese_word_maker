@@ -29,13 +29,18 @@ def _lookup_character():
 
     if get_words_future.result() is not None:
         word, chars = get_words_future.result()
+    else:
+        return 'Uh oh. The server went and pooped itself. Investigate the logs for more info.'
 
-        # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen relatively
-        # infrequently so we should still get a net time save.
+    if word is None and chars is None:
+        return 'No results were found for that word.'
+    else:
+        # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen
+        # relatively infrequently so we should still get a net time save.
         if input_word_traditional != word[0]["traditional"]:
-            logging.warning("We used some heuristics to convert from Simplified to Traditional Chinese. It looks like on "
-                            "further evaluation they failed. This is not fatal and will be automatically fixed, but we must"
-                            " make a new web request which will take a few seconds.")
+            logging.warning("We used some heuristics to convert from Simplified to Traditional Chinese. It looks like "
+                            "on further evaluation they failed. This is not fatal and will be automatically fixed, but "
+                            "we must make a new web request which will take a few seconds.")
             logging.warning("The original search was for " + input_word + " which was converted to " +
                             input_word_traditional + " but mdbg.net returned " + word[0]["traditional"])
             example_future = executor.submit(get_examples_html, word[0]["traditional"])
@@ -49,7 +54,8 @@ def _lookup_character():
             logging.info("Performing character lookup for " + word[0]["traditional"])
             char_future_server = executor.submit(get_chars_html, word[0]["characters"],
                                                  write_character=save_character_checked, server_mode=True)
-            char_future = executor.submit(get_chars_html, word[0]["characters"], image_location=app.config['IMAGE_FOLDER'],
+            char_future = executor.submit(get_chars_html, word[0]["characters"],
+                                          image_location=app.config['IMAGE_FOLDER'],
                                           write_character=save_character_checked, server_mode=False)
 
             webpage += render_template("word.html", word=word[0]) + "<hr>"
@@ -59,8 +65,8 @@ def _lookup_character():
             webpage += example_future.result()
 
             if app.config["CREATE_COMBINED"]:
-                output_combined_online(word[0], app.config['OUTPUT_FILE'], app.config['DELIMITER'], char_future.result(),
-                                       example_future.result())
+                output_combined_online(word[0], app.config['OUTPUT_FILE'], app.config['DELIMITER'],
+                                       char_future.result(), example_future.result())
             else:
                 if not path.exists('word_searches.txt'):
                     with open('word_searches.txt', 'w'):
@@ -80,8 +86,6 @@ def _lookup_character():
 
         else:
             return 'We could not find that character in the book!'
-    else:
-        return 'Uh oh. The server went and pooped itself. Investigate the logs for more info.'
 
 
 @app.route('/_generate')
