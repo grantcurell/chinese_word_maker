@@ -20,4 +20,4 @@ character:
 	rm -f character_searches.txt character_searches_clean
 
 server:
-	python3 run.py --run-server --ebook-path ./chinese_tarjetas/combined.epub
+	python3 run.py --run-server --create-combined
