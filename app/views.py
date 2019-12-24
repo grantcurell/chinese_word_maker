@@ -24,7 +24,7 @@ def _lookup_character():
 
     executor = ThreadPoolExecutor(max_workers=4)
 
-    get_words_future = executor.submit(get_words, [input_word], app.config["ebook"], select_first=True)
+    get_words_future = executor.submit(get_words, [input_word], app.config["ebook"], select_closest_match=True)
     example_future = executor.submit(get_examples_html, input_word_traditional)
 
     word, chars = get_words_future.result()

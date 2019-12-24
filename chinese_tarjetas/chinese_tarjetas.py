@@ -416,7 +416,7 @@ def output_combined_online(word, output_file_name, delimiter, char_line, example
         output_file.write((example_line.replace('\n', "") + "\n").replace(delimiter, ""))
 
 
-def get_words(words, ebook=None, skip_choices=False, select_first=False):
+def get_words(words, ebook=None, skip_choices=False, select_closest_match=False):
     """
     Reaches out to www.mdbg.net and grabs the data for each of the words on which you want data or searches an
     instance of Chinese Blockbust eBook for characters.
@@ -424,7 +424,7 @@ def get_words(words, ebook=None, skip_choices=False, select_first=False):
     :param list words: The list of the words you want to add
     :param ebook ebook: An eBook file object
     :param bool skip_choices: Whether you want to skip selection of the different possible options
-    :param bool select_first: Instead of skipping the choices it will just automatically select the first choice
+    :param bool select_closest_match: Instead of skipping the choices it will just automatically select the first choice
                               available
     :return: Returns two lists, one with the words found and the other with the characters found
     :rtype: tuple of lists
@@ -458,7 +458,8 @@ def get_words(words, ebook=None, skip_choices=False, select_first=False):
                         else:
                             new_chars.append(new_char[0])
                 else:
-                    new_word = process_word(word, skip_choices=skip_choices, ebook=ebook, select_first=select_first)
+                    new_word = process_word(word, skip_choices=skip_choices, ebook=ebook,
+                                            select_closest_match=select_closest_match)
                     if new_word:
                         new_words.append(new_word)
 
@@ -550,20 +551,21 @@ def process_word_entry(entry, ebook=None):
     return organized_entry
 
 
-def process_word(word, skip_choices=False, ebook=None, select_first=False):
+def process_word(word, skip_choices=False, ebook=None, select_closest_match=False):
     """
     Processes a word in the list of words
 
     :param str word: The word from the list
     :param skip_choices: Whether we should skip prompting the user if there are multiple choices or not
     :param ebook ebook: An eBook file object
-    :param bool select_first: Instead of skipping the choices it will just automatically select the first choice available
+    :param bool select_closest_match: Instead of skipping the choices it will just automatically select the closest
+                                      match
     :return: Returns a dictionary containing the word's entry
     :rtype: dict
     """
 
     logging.info("Requested word is: " + word)
-    logging.info("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word)
+    logging.debug("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word)
 
     url_string = "https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" \
                  + quote(word)  # type: str
@@ -593,8 +595,21 @@ def process_word(word, skip_choices=False, ebook=None, select_first=False):
         print("\n\n")
         selection = -1  # type: int
 
-        if select_first:
+        if select_closest_match:
+            # We use the simplified to avoid the one to many problem.
+            simplified_word = HanziConv.toSimplified(word)
+
             selection = 1
+
+            for index, entry in enumerate(entries):
+                if entry["simplified"].strip() != "":
+                    if entry["simplified"] == simplified_word:
+                        selection = index + 1
+                        break
+                elif entry["traditional"] == simplified_word:
+                    selection = index + 1
+                    break
+
         else:
             while (selection > len(entries) or selection < 1) and selection != 0:
                 selection = int(input("Enter your selection: "))
