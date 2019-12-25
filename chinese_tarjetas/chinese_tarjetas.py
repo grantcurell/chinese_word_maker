@@ -114,22 +114,19 @@ def get_examples_html(word):
     return template.render(results=results)
 
 
-def get_chars_html(characters, image_location=path.join("app", "static"), write_character=False, server_mode=False):
+def get_chars_html(characters, image_location=path.join("app", "static"), server_mode=False, example=None):
     """
     Grabs the HTML for each of the characters in a list of characters. This is used for generating the web pages.
 
     :param  list characters: A list of the characters you want to grab
     :param str image_location: Used to optionally control where the image is written to
-    :param write_character: Used to determine whether individual characters should be written to output file
     :param bool server_mode: Used to determine whether this was called by a running web server or not
+    :param str example: The HTML for the example text
     :return: Returns a webpgae with all the character data rendered
     :rtype: str
     """
 
     webpage = ""
-
-    # Used to print out multiple characters in the event there are duplicates
-    has_duplicates = False
 
     image_path = ""
 
@@ -144,42 +141,19 @@ def get_chars_html(characters, image_location=path.join("app", "static"), write_
             with open(create_image_name(organized_entry, image_location), "wb") as img_file:
                 img_file.write(organized_entry["image_content"])  # Output the image to disk
 
-        if not path.exists('character_searches.txt'):
-            with open('character_searches.txt', 'w'): pass
+        env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
+        if server_mode:
+            template = env.get_template("character.html")
+        else:
+            template = env.get_template("character_no_style.html")
 
-        with open("character_searches.txt", "r", encoding="utf-8-sig") as file:
-            characters_file_contents = file.read()
-
-            if (organized_entry["traditional"] not in characters_file_contents and
-                    ("simplified" in organized_entry and organized_entry["simplified"] not in characters_file_contents))\
-                    or ("simplified" not in organized_entry and organized_entry["traditional"] not in characters_file_contents)\
-                    or has_duplicates:
-
-                if write_character:
-                    with open("character_searches.txt", "a+", encoding="utf-8-sig") as character_searches:
-                        if "has_duplicates" in organized_entry:
-                            has_duplicates = True
-
-                        if "simplified" in organized_entry:
-                            character_searches.write(
-                                organized_entry["traditional"] + "/" + organized_entry["simplified"] + " \\ " +
-                                organized_entry["pinyin_text"] + " \\ " + organized_entry["defs_text"] + "\n")
-                        else:
-                            character_searches.write(
-                                organized_entry["traditional"] + " \\ " + organized_entry["pinyin_text"] + " \\ "
-                                + organized_entry["defs_text"] + "\n")
-
-            env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
-            if server_mode:
-                template = env.get_template("character.html")
-            else:
-                template = env.get_template("character_no_style.html")
-
-            if server_mode:
-                webpage += template.render(image_path=image_path, results=organized_entry) + "<hr>"
-            else:
-                webpage += template.render(image_path=create_image_name(organized_entry), results=organized_entry) + \
-                           "<hr>"
+        if server_mode:
+            if example is not None:
+                organized_entry["examples"] += example
+            webpage += template.render(image_path=image_path, results=organized_entry) + "<hr>"
+        else:
+            webpage += template.render(image_path=create_image_name(organized_entry), results=organized_entry) + \
+                       "<hr>"
 
     # There are a huge number of BR tags and they aren't actually necessary.
     return webpage.replace("<br>", "")
@@ -253,13 +227,14 @@ def output_words(words_output_file_name, word_list, delimiter):
             logging.info("Writing: " + _get_word_line(word, delimiter))
 
 
-def _get_character_line(character, image_file_name, delimiter):
+def _get_character_line(character, image_file_name, delimiter, example=None):
     """
     Gets the line to be output for a single character
 
     :param dict character: The character we want to output
     :param str image_file_name: The image file name for the character in question
     :param str delimiter: The delimiter you want to use in the output
+    :param str example: The HTML for the example text
     :return: Returns the HTML string for the character
     :rtype: str
     """
@@ -292,6 +267,9 @@ def _get_character_line(character, image_file_name, delimiter):
         if key != "image" and key != "image_content" and key != "has_duplicates":
             character_cleaned[key] = value.replace("\n", "")
 
+    if example is None:
+        example = get_examples_html(character_cleaned["traditional"])
+
     # The only if conditions ensure that if a field is missing because it isn't part of a page that an error
     # isn't thrown.
     return  \
@@ -303,13 +281,13 @@ def _get_character_line(character, image_file_name, delimiter):
         "<img src=\"" + image_file_name + "\" />" + delimiter + \
         character_cleaned["mnemonics"] + delimiter + \
         character_cleaned["story"] + delimiter + \
-        character_cleaned["examples"] + "<hr>" + get_examples_html(character_cleaned["traditional"]) + delimiter + \
+        character_cleaned["examples"] + "<hr>" + example + delimiter + \
         character_cleaned["additionalinfo"] + delimiter + \
         character_cleaned["simplifiedcomponents"] + delimiter + \
         character_cleaned["traditionalcomponents"]
 
 
-def output_characters(chars_output_file_name, char_images_folder, char_list, delimiter):
+def output_characters(chars_output_file_name, char_images_folder, char_list, delimiter, example=None, online=False):
     """
     Outputs the new characters to a file for import into Anki
 
@@ -317,6 +295,8 @@ def output_characters(chars_output_file_name, char_images_folder, char_list, del
     :param str char_images_folder: The folder which will store the images associated with the character images
     :param list char_list: The list of characters we want to write to file
     :param str delimiter: The delimiter you want to use for your flashcards
+    :param str example: The HTML for the example text
+    :param bool online: Used to determine if this is being output from the server or from the command line
     :return: Returns nothing
     """
 
@@ -327,7 +307,12 @@ def output_characters(chars_output_file_name, char_images_folder, char_list, del
         os.mkdir(char_images_folder)
         logging.info("Directory " + char_images_folder + " Created ")
 
-    with open(chars_output_file_name, 'w', encoding="utf-8-sig") as output_file:
+    if online:
+        mode = 'a+'
+    else:
+        mode = 'w'
+
+    with open(chars_output_file_name, mode, encoding="utf-8-sig") as output_file:
 
         for character in char_list:
 
@@ -335,7 +320,8 @@ def output_characters(chars_output_file_name, char_images_folder, char_list, del
             with open(create_image_name(character, char_images_folder), "wb") as img_file:
                 img_file.write(character["image_content"])  # Output the image to disk
 
-            character_line = _get_character_line(character, create_image_name(character), delimiter)
+            character_line = _get_character_line(character, create_image_name(character), delimiter,
+                                                 example.replace("\n", ""))
 
             output_file.write(character_line + "\n")
 

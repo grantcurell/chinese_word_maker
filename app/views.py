@@ -5,7 +5,7 @@ from hanziconv import HanziConv
 from app import app
 from app.forms import CharacterForm, GenerateFlashcardsForm
 from os import path, system
-from chinese_tarjetas.chinese_tarjetas import get_words, get_chars_html, get_examples_html, output_combined_online
+from chinese_tarjetas.chinese_tarjetas import get_words, get_chars_html, get_examples_html, output_combined_online, output_characters
 
 
 @app.route('/_lookup_character')
@@ -35,21 +35,37 @@ def _lookup_character():
     if word is None and chars is None:
         return 'No results were found for that word.'
     else:
-        # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen
-        # relatively infrequently so we should still get a net time save.
-        if input_word_traditional != word[0]["traditional"]:
-            logging.warning("We used some heuristics to convert from Simplified to Traditional Chinese. It looks like "
-                            "on further evaluation they failed. This is not fatal and will be automatically fixed, but "
-                            "we must make a new web request which will take a few seconds.")
-            logging.warning("The original search was for " + input_word + " which was converted to " +
-                            input_word_traditional + " but mdbg.net returned " + word[0]["traditional"])
-            example_future = executor.submit(get_examples_html, word[0]["traditional"])
 
         if chars is not None:
 
-            return get_chars_html(chars, write_character=save_character_checked, server_mode=True)
+            # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen
+            # relatively infrequently so we should still get a net time save.
+            if input_word_traditional != chars[0]["traditional"]:
+                logging.warning(
+                    "We used some heuristics to convert from Simplified to Traditional Chinese. It looks like "
+                    "on further evaluation they failed. This is not fatal and will be automatically fixed, but "
+                    "we must make a new web request which will take a few seconds.")
+                logging.warning("The original search was for " + input_word + " which was converted to " +
+                                input_word_traditional + " but mdbg.net returned " + chars[0]["traditional"])
+                example_future = executor.submit(get_examples_html, chars[0]["traditional"])
+
+            if save_character_checked:
+                output_characters("character_searches.txt", app.config['IMAGE_FOLDER'], [chars[0]],
+                                  app.config['DELIMITER'], example_future.result(), online=True)
+            return get_chars_html(chars, server_mode=True, example=example_future.result())
 
         elif word is not None:
+
+            # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen
+            # relatively infrequently so we should still get a net time save.
+            if input_word_traditional != word[0]["traditional"]:
+                logging.warning(
+                    "We used some heuristics to convert from Simplified to Traditional Chinese. It looks like "
+                    "on further evaluation they failed. This is not fatal and will be automatically fixed, but "
+                    "we must make a new web request which will take a few seconds.")
+                logging.warning("The original search was for " + input_word + " which was converted to " +
+                                input_word_traditional + " but mdbg.net returned " + word[0]["traditional"])
+                example_future = executor.submit(get_examples_html, word[0]["traditional"])
 
             logging.info("Performing character lookup for " + word[0]["traditional"])
             char_future_server = executor.submit(get_chars_html, word[0]["characters"],
