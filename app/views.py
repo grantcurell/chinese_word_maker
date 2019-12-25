@@ -34,6 +34,8 @@ def _lookup_character():
 
     if word is None and chars is None:
         return 'No results were found for that word.'
+    elif len(word[0]["traditional"]) == 1 and len(input_word) > 1:
+        return 'No results were found for that word.'
     else:
 
         if chars is not None:
