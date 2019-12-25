@@ -68,11 +68,10 @@ def _lookup_character():
                 example_future = executor.submit(get_examples_html, word[0]["traditional"])
 
             logging.info("Performing character lookup for " + word[0]["traditional"])
-            char_future_server = executor.submit(get_chars_html, word[0]["characters"],
-                                                 write_character=save_character_checked, server_mode=True)
+
+            char_future_server = executor.submit(get_chars_html, word[0]["characters"], server_mode=True)
             char_future = executor.submit(get_chars_html, word[0]["characters"],
-                                          image_location=app.config['IMAGE_FOLDER'],
-                                          write_character=save_character_checked, server_mode=False)
+                                          image_location=app.config['IMAGE_FOLDER'], server_mode=False)
 
             webpage += render_template("word.html", word=word[0]) + "<hr>"
             webpage += char_future_server.result()
