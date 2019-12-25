@@ -34,8 +34,6 @@ def _lookup_character():
 
     if word is None and chars is None:
         return 'No results were found for that word.'
-    elif len(word[0]["traditional"]) == 1 and len(input_word) > 1:
-        return 'No results were found for that word.'
     else:
 
         if chars is not None:
@@ -57,6 +55,9 @@ def _lookup_character():
             return get_chars_html(chars, server_mode=True, example=example_future.result())
 
         elif word is not None:
+
+            if len(word[0]["traditional"]) == 1 and len(input_word) > 1:
+                return 'No results were found for that word.'
 
             # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen
             # relatively infrequently so we should still get a net time save.
