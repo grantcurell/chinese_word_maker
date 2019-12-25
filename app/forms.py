@@ -233,7 +233,7 @@ class CharacterForm:
 
     save_character_checkbox = CheckBox(
         form_name="save_character_checkbox"
-        , label="Save this character?"
+        , label="Save this character? (Does nothing for words.)"
         , description=
         "Use this to control whether to save this character in the list of characters to learn.")
 
