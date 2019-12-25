@@ -51,7 +51,11 @@ def get_examples_html(word):
     # We use the big5 encoding type because this website specifically uses traditional characters.
     params = {'inputword': word.encode(encoding="big5", errors="strict"), "selectAB": "AAB",
               "inputpos": "", "selectFeature": ""}
-    r = requests.post("http://asbc.iis.sinica.edu.tw/process.asp", data=params)
+    try:
+        r = requests.post("http://asbc.iis.sinica.edu.tw/process.asp", data=params)
+    except ConnectionError:
+        logging.error("It looks like connecting to asbc failed. There's a good chance you're getting throttled.")
+        return "Connecting to asbc for an example failed. There's a good chance you're getting throttled."
 
     bs = BeautifulSoup(r.content.decode('big5', errors="replace"), features="lxml")
 
