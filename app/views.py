@@ -1,11 +1,8 @@
-import logging
-from concurrent.futures.thread import ThreadPoolExecutor
 from flask import render_template, request
-from hanziconv import HanziConv
 from app import app
 from app.forms import CharacterForm, GenerateFlashcardsForm
-from os import path, system
-from chinese_tarjetas.chinese_tarjetas import get_words, get_chars_html, get_examples_html, output_combined_online, output_characters
+from os import system
+from chinese_tarjetas.chinese_tarjetas import *
 
 
 @app.route('/_lookup_character')
@@ -21,11 +18,13 @@ def _lookup_character():
 
     input_word = input_text.split(' ')[0]
     input_word_traditional = HanziConv.toTraditional(input_word)
+    input_word_simplified = HanziConv.toSimplified(input_word)
 
     executor = ThreadPoolExecutor(max_workers=4)
 
     get_words_future = executor.submit(get_words, [input_word], app.config["ebook"], select_closest_match=True)
-    example_future = executor.submit(get_examples_html, input_word_traditional)
+    # example_future = executor.submit(get_examples_scholarly_html, input_word_traditional)
+    example_future = executor.submit(get_examples_html, input_word_simplified)
 
     if get_words_future.result() is not None:
         word, chars = get_words_future.result()
@@ -47,7 +46,7 @@ def _lookup_character():
                     "we must make a new web request which will take a few seconds.")
                 logging.warning("The original search was for " + input_word + " which was converted to " +
                                 input_word_traditional + " but mdbg.net returned " + chars[0]["traditional"])
-                example_future = executor.submit(get_examples_html, chars[0]["traditional"])
+                example_future = executor.submit(get_examples_scholarly_html, chars[0]["traditional"])
 
             if save_character_checked:
                 output_characters("character_searches.txt", app.config['IMAGE_FOLDER'], [chars[0]],
@@ -68,7 +67,7 @@ def _lookup_character():
                     "we must make a new web request which will take a few seconds.")
                 logging.warning("The original search was for " + input_word + " which was converted to " +
                                 input_word_traditional + " but mdbg.net returned " + word[0]["traditional"])
-                example_future = executor.submit(get_examples_html, word[0]["traditional"])
+                example_future = executor.submit(get_examples_scholarly_html, word[0]["traditional"])
 
             logging.info("Performing character lookup for " + word[0]["traditional"])
 

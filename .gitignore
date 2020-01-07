@@ -39,3 +39,5 @@ character_searches_clean
 *.swp
 
 backups/word_searches.bak
+
+*.exe

@@ -16,6 +16,7 @@ import sys
 import re
 import jinja2
 import requests
+from selenium import webdriver
 
 
 def create_image_name(organized_entry, image_location=""):
@@ -39,6 +40,71 @@ def create_image_name(organized_entry, image_location=""):
 
 
 def get_examples_html(word):
+    """
+    Reach out to https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=%E4%B8%BA%E7%9D%80
+    and get example sentences.
+
+    :param str word: The word, in traditional character format, for which you want to retrieve examples
+    :return Returns a template string with all of the examples formatted within it.
+    :rtype str
+    """
+    logging.info("Creating an example for " + word)
+
+    logging.info("Requested word is: " + word)
+    logging.debug("URL is: https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=" + word)
+
+    url_string = "https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=" \
+                 + quote(word)  # type: str
+
+    # html = urlopen(url_string).read().decode('utf-8')  # type: str
+
+    options = webdriver.ChromeOptions()
+    options.add_argument('--ignore-certificate-errors')
+    options.add_argument("--test-type")
+    # options.binary_location = "/usr/bin/chromium"
+    driver = webdriver.Chrome(chrome_options=options)
+    driver.get(url_string)
+
+    html = driver.page_source
+    # driver.close()
+
+    soup = BeautifulSoup(html, 'html.parser')  # type: bs4.BeautifulSoup
+
+    results = soup.find_all("div", {"class": "example_lst"})  # type: bs4.element.ResultSet
+
+    if len(results) > 1:
+        return "The HTML contained more than one div with class \"example_lst\" which shouldn't happen. Has their " \
+               "HTML changed? This error prevents us from continuing to generate an example."
+
+    examples = []
+
+    i = 0
+    for example in results[0].find_all("li"):
+
+        # We don't need more than five examples.
+        if i > 4:
+            break
+
+        data = example.find("div", {"class": "exam"})
+
+        chinese_sentence = data.find("p", {"class": "stc"}).text.split(" ")[1].replace(word, "<em class=\"h1\">" + word
+                                                                                       + "</em>")
+        # I know the way I did this is gross. Sue me.
+        pinyin = str(data.find("p", {"class": "pinyin"})).replace("<p class=\"pinyin\">", "").replace("</p>", "")
+        translation = data.find("p", {"class": "trans"}).text
+
+        examples.append((chinese_sentence, pinyin, translation))
+
+        i = i + 1
+
+    env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
+    template = env.get_template("examples.html")
+
+    return template.render(examples=examples)
+
+
+
+def get_examples_scholarly_html(word):
     """
     Reach out to http://asbc.iis.sinica.edu.tw/ and get example sentences.
 
@@ -113,7 +179,7 @@ def get_examples_html(word):
         i = i + 1
 
     env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
-    template = env.get_template("examples.html")
+    template = env.get_template("examples_scholarly.html")
 
     return template.render(results=results)
 
@@ -272,7 +338,7 @@ def _get_character_line(character, image_file_name, delimiter, example=None):
             character_cleaned[key] = value.replace("\n", "")
 
     if example is None:
-        example = get_examples_html(character_cleaned["traditional"])
+        example = get_examples_scholarly_html(character_cleaned["traditional"])
 
     # The only if conditions ensure that if a field is missing because it isn't part of a page that an error
     # isn't thrown.
@@ -358,7 +424,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
         # Here we use threading to launch multiple threads to get the examples at the same time so this doesn't take
         # forever.
         with ThreadPoolExecutor(max_workers=thread_count) as executor:
-            future_example = {executor.submit(get_examples_html, word["traditional"]): word for word in word_list}
+            future_example = {executor.submit(get_examples_scholarly_html, word["traditional"]): word for word in word_list}
 
             length = str(len(word_list))
             i = 1
