@@ -19,7 +19,7 @@ import jinja2
 import requests
 
 
-def create_driver(headless=True, binary_location=None):
+def create_driver(headless=True, binary_location=os.getcwd()):
     """
     Creates a Google-based web driver
     :return: Returns a type of selenium.webdriver.chrome.webdriver.WebDriver for use in opening a chrome browser
