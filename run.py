@@ -1,7 +1,7 @@
 __author__ = "Grant Curell"
 __copyright__ = "Do what you want with it"
 __license__ = "GPLv3"
-__version__ = "1.4.4"
+__version__ = "1.5.0"
 __maintainer__ = "Grant Curell"
 
 from ebooklib import epub
@@ -21,6 +21,10 @@ def main():
     parser.add_argument('--words-output-file', metavar='WORDS-OUTPUT-FILE', dest="words_output_file_name", type=str,
                         required=False, default="word_list.txt",
                         help='By default this is word_list.txt. You may change it by providing this argument.')
+    parser.add_argument('--use-scholarly-examples', dest="scholarly_examples", type=bool,
+                        required=False, default=False,
+                        help='Controls whether you will use the old style scholarly articles to generate examples or '
+                             'not.')
     parser.add_argument('--chars-output-file', metavar='CHARS-OUTPUT-FILE', dest="chars_output_file_name", type=str,
                         required=False, default="chars_list.txt",
                         help='By default this is chars_list.txt. You may change it by providing this argument.')
@@ -122,9 +126,17 @@ def main():
             app.config['OUTPUT_FILE'] = "word_searches_combined.txt"
             app.config['IMAGE_FOLDER'] = args.chars_image_folder
             app.config['DELIMITER'] = args.delimiter
+            driver = create_driver()
+            app.config['DRIVER'] = driver
+
+            if args.scholarly_examples:
+                app.config['SCHOLARLY'] = True
+            else:
+                app.config['SCHOLARLY'] = False
 
         app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
         app.run(host='0.0.0.0', port=args.port)
+        driver.close()
     elif args.single_word:
 
         words, characters = get_words(args.single_word, app.config["ebook"], args.skip_choices)

@@ -6,6 +6,7 @@ from ntpath import basename
 from os import path
 from hanziconv import HanziConv
 from googletrans import Translator
+from selenium import webdriver
 import concurrent.futures
 import ebooklib
 import traceback
@@ -16,7 +17,24 @@ import sys
 import re
 import jinja2
 import requests
-from selenium import webdriver
+
+
+def create_driver(headless=True, binary_location=None):
+    """
+    Creates a Google-based web driver
+    :return: Returns a type of selenium.webdriver.chrome.webdriver.WebDriver for use in opening a chrome browser
+    """
+    options = webdriver.ChromeOptions()
+    options.add_argument('--ignore-certificate-errors')
+    options.add_argument("--test-type")
+
+    if headless:
+        options.add_argument("--headless")
+
+    if binary_location is not None:
+        options.binary_location = binary_location
+
+    return webdriver.Chrome(chrome_options=options)
 
 
 def create_image_name(organized_entry, image_location=""):
@@ -39,12 +57,14 @@ def create_image_name(organized_entry, image_location=""):
         return file_name + "-" + organized_entry["pinyin_text"] + '.' + file_extension
 
 
-def get_examples_html(word):
+def get_examples_html(word, driver=None, is_server=True):
     """
     Reach out to https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=%E4%B8%BA%E7%9D%80
     and get example sentences.
 
     :param str word: The word, in traditional character format, for which you want to retrieve examples
+    :param selenium.webdriver.chrome.webdriver.WebDriver driver: The webdriver we want to use to generate the example
+    :param bool is_server: Determines if the function is being called from a server or not.
     :return Returns a template string with all of the examples formatted within it.
     :rtype str
     """
@@ -56,17 +76,12 @@ def get_examples_html(word):
     url_string = "https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=" \
                  + quote(word)  # type: str
 
-    # html = urlopen(url_string).read().decode('utf-8')  # type: str
+    if not is_server:
+        driver = create_driver()
 
-    options = webdriver.ChromeOptions()
-    options.add_argument('--ignore-certificate-errors')
-    options.add_argument("--test-type")
-    # options.binary_location = "/usr/bin/chromium"
-    driver = webdriver.Chrome(chrome_options=options)
     driver.get(url_string)
 
     html = driver.page_source
-    # driver.close()
 
     soup = BeautifulSoup(html, 'html.parser')  # type: bs4.BeautifulSoup
 
@@ -87,10 +102,13 @@ def get_examples_html(word):
 
         data = example.find("div", {"class": "exam"})
 
-        chinese_sentence = data.find("p", {"class": "stc"}).text.split(" ")[1].replace(word, "<em class=\"h1\">" + word
-                                                                                       + "</em>")
+        chinese_sentence = data.find("p", {"class": "stc"}).text.split(" ")
+        del chinese_sentence[-2:]
+        chinese_sentence = "".join(chinese_sentence).replace(word, "<em class=\"highlight\">" + word + "</em>")
+
         # I know the way I did this is gross. Sue me.
-        pinyin = str(data.find("p", {"class": "pinyin"})).replace("<p class=\"pinyin\">", "").replace("</p>", "")
+        pinyin = str(data.find("p", {"class": "pinyin"})).replace("<p class=\"pinyin\">", "").replace("</p>", "")\
+            .replace("hl", "highlight")
         translation = data.find("p", {"class": "trans"}).text
 
         examples.append((chinese_sentence, pinyin, translation))
@@ -101,7 +119,6 @@ def get_examples_html(word):
     template = env.get_template("examples.html")
 
     return template.render(examples=examples)
-
 
 
 def get_examples_scholarly_html(word):
@@ -338,7 +355,7 @@ def _get_character_line(character, image_file_name, delimiter, example=None):
             character_cleaned[key] = value.replace("\n", "")
 
     if example is None:
-        example = get_examples_scholarly_html(character_cleaned["traditional"])
+        example = get_examples_html(character_cleaned["traditional"], is_server=False)
 
     # The only if conditions ensure that if a field is missing because it isn't part of a page that an error
     # isn't thrown.
@@ -424,7 +441,9 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
         # Here we use threading to launch multiple threads to get the examples at the same time so this doesn't take
         # forever.
         with ThreadPoolExecutor(max_workers=thread_count) as executor:
-            future_example = {executor.submit(get_examples_scholarly_html, word["traditional"]): word for word in word_list}
+
+            future_example = {executor.submit(get_examples_html, word["traditional"], is_server=False): word for word
+                              in word_list}
 
             length = str(len(word_list))
             i = 1

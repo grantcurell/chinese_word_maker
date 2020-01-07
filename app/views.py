@@ -1,8 +1,12 @@
+import logging
 from flask import render_template, request
 from app import app
+from concurrent.futures.thread import ThreadPoolExecutor
 from app.forms import CharacterForm, GenerateFlashcardsForm
-from os import system
-from chinese_tarjetas.chinese_tarjetas import *
+from os import path, system
+from hanziconv import HanziConv
+from chinese_tarjetas.chinese_tarjetas import get_words, get_chars_html, get_examples_html, output_combined_online, \
+    output_characters, get_examples_scholarly_html
 
 
 @app.route('/_lookup_character')
@@ -23,8 +27,10 @@ def _lookup_character():
     executor = ThreadPoolExecutor(max_workers=4)
 
     get_words_future = executor.submit(get_words, [input_word], app.config["ebook"], select_closest_match=True)
-    # example_future = executor.submit(get_examples_scholarly_html, input_word_traditional)
-    example_future = executor.submit(get_examples_html, input_word_simplified)
+    if app.config['SCHOLARLY']:
+        example_future = executor.submit(get_examples_scholarly_html, input_word_traditional)
+    else:
+        example_future = executor.submit(get_examples_html, input_word_simplified, driver=app.config['DRIVER'])
 
     if get_words_future.result() is not None:
         word, chars = get_words_future.result()
@@ -37,16 +43,17 @@ def _lookup_character():
 
         if chars is not None:
 
-            # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen
-            # relatively infrequently so we should still get a net time save.
-            if input_word_traditional != chars[0]["traditional"]:
-                logging.warning(
-                    "We used some heuristics to convert from Simplified to Traditional Chinese. It looks like "
-                    "on further evaluation they failed. This is not fatal and will be automatically fixed, but "
-                    "we must make a new web request which will take a few seconds.")
-                logging.warning("The original search was for " + input_word + " which was converted to " +
-                                input_word_traditional + " but mdbg.net returned " + chars[0]["traditional"])
-                example_future = executor.submit(get_examples_scholarly_html, chars[0]["traditional"])
+            if app.config['SCHOLARLY']:
+                # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen
+                # relatively infrequently so we should still get a net time save.
+                if input_word_traditional != chars[0]["traditional"]:
+                    logging.warning(
+                        "We used some heuristics to convert from Simplified to Traditional Chinese. It looks like "
+                        "on further evaluation they failed. This is not fatal and will be automatically fixed, but "
+                        "we must make a new web request which will take a few seconds.")
+                    logging.warning("The original search was for " + input_word + " which was converted to " +
+                                    input_word_traditional + " but mdbg.net returned " + chars[0]["traditional"])
+                    example_future = executor.submit(get_examples_scholarly_html, chars[0]["traditional"])
 
             if save_character_checked:
                 output_characters("character_searches.txt", app.config['IMAGE_FOLDER'], [chars[0]],
