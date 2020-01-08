@@ -59,6 +59,8 @@ def main():
     parser.add_argument('--create-combined', dest="combined_output", required=False, action='store_true',
                         help='Set this option if you want to create flashcards with combined character mnemonics and'
                              ' words in a single output.')
+    parser.add_argument('--show-chrome', dest="show_chrome", required=False, action='store_true',
+                        help='Will disable headless mode on Chromedriver and cause the browser to pop up')
     parser.add_argument('--single-word', metavar='SINGLE-WORD', dest="single_word", type=str, required=False,
                         help='Use if you only want to create a card for a single word.')
     parser.add_argument('--print-usage', dest="print_usage", required=False, action='store_true',
@@ -126,7 +128,10 @@ def main():
             app.config['OUTPUT_FILE'] = "word_searches_combined.txt"
             app.config['IMAGE_FOLDER'] = args.chars_image_folder
             app.config['DELIMITER'] = args.delimiter
-            driver = create_driver()
+            if args.show_chrome:
+                driver = create_driver(headless=False)
+            else:
+                driver = create_driver()
             app.config['DRIVER'] = driver
 
             if args.scholarly_examples:

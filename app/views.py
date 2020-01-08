@@ -30,7 +30,7 @@ def _lookup_character():
     if app.config['SCHOLARLY']:
         example_future = executor.submit(get_examples_scholarly_html, input_word_traditional)
     else:
-        example_future = executor.submit(get_examples_html, input_word_simplified, driver=app.config['DRIVER'])
+        example = get_examples_html(input_word_simplified, driver=app.config['DRIVER'])
 
     if get_words_future.result() is not None:
         word, chars = get_words_future.result()
@@ -56,9 +56,11 @@ def _lookup_character():
                     example_future = executor.submit(get_examples_scholarly_html, chars[0]["traditional"])
 
             if save_character_checked:
+                if app.config['SCHOLARLY']:
+                    example = example_future.result()
                 output_characters("character_searches.txt", app.config['IMAGE_FOLDER'], [chars[0]],
-                                  app.config['DELIMITER'], example_future.result(), online=True)
-            return get_chars_html(chars, server_mode=True, example=example_future.result())
+                                  app.config['DELIMITER'], example, online=True)
+            return get_chars_html(chars, server_mode=True, example=example)
 
         elif word is not None:
 
@@ -86,11 +88,13 @@ def _lookup_character():
             webpage += char_future_server.result()
 
             logging.info("Waiting on example to return.")
-            webpage += example_future.result()
+            if app.config['SCHOLARLY']:
+                example = example_future.result()
+            webpage += example
 
             if app.config["CREATE_COMBINED"]:
                 output_combined_online(word[0], app.config['OUTPUT_FILE'], app.config['DELIMITER'],
-                                       char_future.result(), example_future.result())
+                                       char_future.result(), example)
             else:
                 if not path.exists('word_searches.txt'):
                     with open('word_searches.txt', 'w'):

@@ -7,6 +7,7 @@ from os import path
 from hanziconv import HanziConv
 from googletrans import Translator
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 import concurrent.futures
 import ebooklib
 import traceback
@@ -19,9 +20,13 @@ import jinja2
 import requests
 
 
-def create_driver(headless=True, binary_location=os.getcwd()):
+def create_driver(headless=True, binary_location=None, implicit_wait_time=5):
     """
     Creates a Google-based web driver
+    :param bool headless: Indicates whether to start the browser in headless mode or not
+    :param str binary_location: The location of the chromedriver binary
+    :param int implicit_wait_time: In case someone wants to modify it, they could change the time the browser will wait
+                                   for results to return.
     :return: Returns a type of selenium.webdriver.chrome.webdriver.WebDriver for use in opening a chrome browser
     """
     options = webdriver.ChromeOptions()
@@ -34,7 +39,12 @@ def create_driver(headless=True, binary_location=os.getcwd()):
     if binary_location is not None:
         options.binary_location = binary_location
 
-    return webdriver.Chrome(chrome_options=options)
+    driver = webdriver.Chrome(chrome_options=options)
+
+    # This means the driver will wait up to 10 seconds to find a designated element.
+    driver.implicitly_wait(implicit_wait_time)
+
+    return driver
 
 
 def create_image_name(organized_entry, image_location=""):
@@ -80,6 +90,13 @@ def get_examples_html(word, driver=None, is_server=True):
         driver = create_driver()
 
     driver.get(url_string)
+
+    # This forces Chrome to wait to return until an element with class name autolink appears. Autolink in this case
+    #
+    try:
+        driver.find_element_by_class_name("autolink")
+    except NoSuchElementException:
+        return "No examples found for that word or finding an example took longer than 5 seconds."
 
     html = driver.page_source
 
