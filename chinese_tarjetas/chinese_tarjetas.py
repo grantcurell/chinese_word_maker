@@ -555,7 +555,8 @@ def process_word(word, skip_choices=False, ebook=None):
                         # and we don't want those.
                         is_useless_def = False
                         for definition in entry["defs"]:
-                            if "surname" in str(definition).lower() or "variant of" in str(definition).lower() or str(definition).lower().startswith("see "):
+                            if "surname" in str(definition).lower() or "variant of" in str(definition).lower() \
+                                    or str(definition).lower().startswith("see "):
                                 is_useless_def = True
                         if not is_useless_def:
                             break
@@ -568,7 +569,8 @@ def process_word(word, skip_choices=False, ebook=None):
                     # and we don't want those.
                     is_useless_def = False
                     for definition in entry["defs"]:
-                        if "surname" in str(definition).lower() or "variant of" in str(definition).lower() or str(definition).lower().startswith("see "):
+                        if "surname" in str(definition).lower() or "variant of" in str(definition).lower() \
+                                or str(definition).lower().startswith("see "):
                             is_useless_def = True
                     if not is_useless_def:
                         break
