@@ -233,7 +233,7 @@ class CharacterForm:
 
     do_not_save_word_checkbox = CheckBox(
         form_name="do_not_save_word_checkbox"
-        , label="Do not save this word. (Prevents the word from being written to disk."
+        , label="Do not save this word. (Prevents the word from being written to disk.)"
         , description=
         "Use this to control whether to save this character in the list of characters to learn.")
 
