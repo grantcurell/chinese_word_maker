@@ -6,7 +6,7 @@ from app.forms import CharacterForm, GenerateFlashcardsForm
 from os import path, system
 from hanziconv import HanziConv
 from chinese_tarjetas.chinese_tarjetas import get_words, get_chars_html, get_examples_html, output_combined_online, \
-    output_characters, get_examples_scholarly_html
+    get_examples_scholarly_html
 
 
 @app.route('/_lookup_character')
@@ -16,9 +16,9 @@ def _lookup_character():
 
     input_text = request.args.get('character_to_lookup').strip()
     if request.args.get('save_character') == "true":
-        save_character_checked = True
+        do_not_save_word_is_checked = True
     else:
-        save_character_checked = False
+        do_not_save_word_is_checked = False
 
     input_word = input_text.split(' ')[0]
     input_word_traditional = HanziConv.toTraditional(input_word)
@@ -26,43 +26,22 @@ def _lookup_character():
 
     executor = ThreadPoolExecutor(max_workers=4)
 
-    get_words_future = executor.submit(get_words, [input_word], app.config["ebook"], select_closest_match=True)
+    get_words_future = executor.submit(get_words, [input_word], app.config["ebook"], skip_choices=True)
     if app.config['SCHOLARLY']:
         example_future = executor.submit(get_examples_scholarly_html, input_word_traditional)
     else:
         example = get_examples_html(input_word_simplified, driver=app.config['DRIVER'])
 
     if get_words_future.result() is not None:
-        word, chars = get_words_future.result()
+        word = get_words_future.result()
     else:
         return 'Uh oh. The server went and pooped itself. Investigate the logs for more info.'
 
-    if word is None and chars is None:
+    if word is None:
         return 'No results were found for that word.'
     else:
 
-        if chars is not None:
-
-            if app.config['SCHOLARLY']:
-                # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen
-                # relatively infrequently so we should still get a net time save.
-                if input_word_traditional != chars[0]["traditional"]:
-                    logging.warning(
-                        "We used some heuristics to convert from Simplified to Traditional Chinese. It looks like "
-                        "on further evaluation they failed. This is not fatal and will be automatically fixed, but "
-                        "we must make a new web request which will take a few seconds.")
-                    logging.warning("The original search was for " + input_word + " which was converted to " +
-                                    input_word_traditional + " but mdbg.net returned " + chars[0]["traditional"])
-                    example_future = executor.submit(get_examples_scholarly_html, chars[0]["traditional"])
-
-            if save_character_checked:
-                if app.config['SCHOLARLY']:
-                    example = example_future.result()
-                output_characters("character_searches.txt", app.config['IMAGE_FOLDER'], [chars[0]],
-                                  app.config['DELIMITER'], example, online=True)
-            return get_chars_html(chars, server_mode=True, example=example)
-
-        elif word is not None:
+        if word is not None:
 
             if len(word[0]["traditional"]) == 1 and len(input_word) > 1:
                 return 'No results were found for that word.'
@@ -90,30 +69,28 @@ def _lookup_character():
             logging.info("Waiting on example to return.")
             if app.config['SCHOLARLY']:
                 example = example_future.result()
+
             webpage += example
 
-            if app.config["CREATE_COMBINED"]:
+            if not do_not_save_word_is_checked:
                 output_combined_online(word[0], app.config['OUTPUT_FILE'], app.config['DELIMITER'],
-                                       char_future.result(), example)
-            else:
-                if not path.exists('word_searches.txt'):
-                    with open('word_searches.txt', 'w'):
-                        pass
+                                           char_future.result(), example)
 
-                with open("word_searches.txt", "r", encoding="utf-8-sig") as file:
-                    word_file_contents = file.read()
+            if not path.exists('word_searches.txt'):
+                with open('word_searches.txt', 'w'):
+                    pass
 
-                    if (not word[0]["simplified"] and word[0]["traditional"] not in word_file_contents) or \
-                            (word[0]["traditional"] not in word_file_contents and word[0]["simplified"]
-                             not in word_file_contents):
+            with open("word_searches.txt", "r", encoding="utf-8-sig") as file:
+                word_file_contents = file.read()
 
-                        with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
-                            word_file.write(word[0]["traditional"] + "\n")
+                if (not word[0]["simplified"] and word[0]["traditional"] not in word_file_contents) or \
+                        (word[0]["traditional"] not in word_file_contents and word[0]["simplified"]
+                         not in word_file_contents):
 
-            return webpage
+                    with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
+                        word_file.write(word[0]["traditional"] + "\n")
 
-        else:
-            return 'We could not find that character in the book!'
+        return webpage
 
 
 @app.route('/_generate')

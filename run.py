@@ -1,7 +1,7 @@
 __author__ = "Grant Curell"
 __copyright__ = "Do what you want with it"
 __license__ = "GPLv3"
-__version__ = "1.5.0"
+__version__ = "1.5"
 __maintainer__ = "Grant Curell"
 
 from ebooklib import epub
@@ -25,9 +25,6 @@ def main():
                         required=False, default=False,
                         help='Controls whether you will use the old style scholarly articles to generate examples or '
                              'not.')
-    parser.add_argument('--chars-output-file', metavar='CHARS-OUTPUT-FILE', dest="chars_output_file_name", type=str,
-                        required=False, default="chars_list.txt",
-                        help='By default this is chars_list.txt. You may change it by providing this argument.')
     parser.add_argument('--chars-image-folder', metavar='CHARS-IMAGE-FOLDER', dest="chars_image_folder", type=str,
                         required=False, default=None,
                         help='By default creates a folder called char_images in the current directory to store the '
@@ -56,9 +53,6 @@ def main():
                         help='Specify the port you want Flask to run on')
     parser.add_argument('--thread-count', dest="thread_count", required=False, type=int, default=5,
                         help='Specify the number of worker threads with which you want to grab examples.')
-    parser.add_argument('--create-combined', dest="combined_output", required=False, action='store_true',
-                        help='Set this option if you want to create flashcards with combined character mnemonics and'
-                             ' words in a single output.')
     parser.add_argument('--show-chrome', dest="show_chrome", required=False, action='store_true',
                         help='Will disable headless mode on Chromedriver and cause the browser to pop up')
     parser.add_argument('--single-word', metavar='SINGLE-WORD', dest="single_word", type=str, required=False,
@@ -73,11 +67,11 @@ def main():
         exit(0)
 
     if args.print_usage:
+        print('Run a server:')
+        print("--run-server --use-media-folder --anki-username \"User 1\"")
         print('\nCreate combined cards:')
-        print('python run.py --file word_searches.txt --ebook-path .\chinese_tarjetas\combined.epub --delimiter \ --use-media-folder --anki-username "User 1" --create-combined')
+        print('python run.py --use-media-folder --anki-username "User 1" --file test_words_2.txt --delimiter \ --skip-choices')
         print('\nVisual Studio Code regex for excluding lines starting with asterisk: ^(?!\*).*\\n')
-        print('\nCreate character cards:')
-        print('python run.py --file character_searches.txt --ebook-path .\chinese_tarjetas\combined.epub --delimiter \ --use-media-folder --anki-username "User 1"')
         print('\nMapping for "Chinse Words Updated" is:')
         print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
         exit(0)
@@ -123,37 +117,29 @@ def main():
 
     if args.run_server:
         # This means the user would like to create the cards as the words are found.
-        if args.combined_output:
-            app.config['CREATE_COMBINED'] = True
-            app.config['OUTPUT_FILE'] = "word_searches_combined.txt"
-            app.config['IMAGE_FOLDER'] = args.chars_image_folder
-            app.config['DELIMITER'] = args.delimiter
-            if args.show_chrome:
-                driver = create_driver(headless=False)
-            else:
-                driver = create_driver()
-            app.config['DRIVER'] = driver
+        app.config['OUTPUT_FILE'] = "word_searches_combined.txt"
+        app.config['IMAGE_FOLDER'] = args.chars_image_folder
+        app.config['DELIMITER'] = args.delimiter
+        if args.show_chrome:
+            driver = create_driver(headless=False)
+        else:
+            driver = create_driver()
+        app.config['DRIVER'] = driver
 
-            if args.scholarly_examples:
-                app.config['SCHOLARLY'] = True
-            else:
-                app.config['SCHOLARLY'] = False
+        if args.scholarly_examples:
+            app.config['SCHOLARLY'] = True
+        else:
+            app.config['SCHOLARLY'] = False
 
         app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
         app.run(host='0.0.0.0', port=args.port)
         driver.close()
     elif args.single_word:
 
-        words, characters = get_words(args.single_word, app.config["ebook"], args.skip_choices)
+        words = get_words(args.single_word, app.config["ebook"], args.skip_choices)
 
-        if args.combined_output:
-            output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
-                            thread_count=args.thread_count)
-        else:
-            if words:
-                output_words(args.words_output_file_name, words, args.delimiter)
-            if characters:
-                output_characters(args.chars_output_file_name, args.chars_image_folder, characters, args.delimiter)       
+        output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
+                        thread_count=args.thread_count)
     else:
         if args.input_file_name:
             if Path(args.input_file_name).is_file():
@@ -162,16 +148,10 @@ def main():
                     for word in input_file.readlines():
                         words.append(word)
 
-                words, characters = get_words(words, app.config["ebook"], args.skip_choices)
+                words = get_words(words, app.config["ebook"], args.skip_choices)
 
-                if args.combined_output:
-                    output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
-                                    args.thread_count)
-                else:
-                    if words:
-                        output_words(args.words_output_file_name, words, args.delimiter)
-                    if characters:
-                        output_characters(args.chars_output_file_name, args.chars_image_folder, characters, args.delimiter)
+                output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
+                                args.thread_count)
             else:
                 print(args.input_file_name + " is not a file or doesn't exist!")
                 exit(0)

@@ -231,13 +231,13 @@ class CharacterForm:
         , valid_feedback='Hit "Look Up!"'
         , reaction_file='button_reaction_lookup_character.js')
 
-    save_character_checkbox = CheckBox(
-        form_name="save_character_checkbox"
-        , label="Save this character? (Does nothing for words.)"
+    do_not_save_word_checkbox = CheckBox(
+        form_name="do_not_save_word_checkbox"
+        , label="Do not save this word. (Prevents the word from being written to disk."
         , description=
         "Use this to control whether to save this character in the list of characters to learn.")
 
-    dhcp_settings = [character, save_character_checkbox]
+    dhcp_settings = [character, do_not_save_word_checkbox]
 
 
 class GenerateFlashcardsForm:

@@ -309,134 +309,6 @@ def _get_word_line(word, delimiter):
            "<br>".join(word["defs"]).replace(delimiter, "") + delimiter + word["hsk"].replace(" ", "")
 
 
-def output_words(words_output_file_name, word_list, delimiter):
-    """
-    Outputs the new words to a file for import into Anki
-
-    :param str words_output_file_name: The name of the file to which we want to write the new words
-    :param list word_list: The list of words we want to write to file
-    :param str delimiter: The delimiter you want to use for your flashcards
-    :return: Returns nothing
-    """
-
-    logging.info("Outputting words.")
-
-    with open(words_output_file_name, 'w', encoding="utf-8-sig") as output_file:
-
-        for word in word_list:
-
-            # You need the <br/>s in anki for newlines. The strip makes sure there isn't one randomly trailing
-            output_file.write(_get_word_line(word, delimiter) + "\n")
-
-            logging.info("Writing: " + _get_word_line(word, delimiter))
-
-
-def _get_character_line(character, image_file_name, delimiter, example=None):
-    """
-    Gets the line to be output for a single character
-
-    :param dict character: The character we want to output
-    :param str image_file_name: The image file name for the character in question
-    :param str delimiter: The delimiter you want to use in the output
-    :param str example: The HTML for the example text
-    :return: Returns the HTML string for the character
-    :rtype: str
-    """
-
-    if "simplified" not in character:
-        character["simplified"] = ""
-    if "defs" not in character:
-        character["defs"] = ""
-    if "mnemonics" not in character:
-        character["mnemonics"] = ""
-    if "story" not in character:
-        character["story"] = ""
-    if "examples" not in character:
-        character["examples"] = ""
-    if "additionalinfo" not in character:
-        character["additionalinfo"] = ""
-    if "simplifiedcomponents" not in character:
-        character["simplifiedcomponents"] = ""
-    if "traditionalcomponents" not in character:
-        character["traditionalcomponents"] = ""
-
-    character_cleaned = {}
-
-    logging.debug("Replacing new lines with HTML line breaks.")
-
-    # Replace any newlines in the text with HTML line breaks
-    for key, value in character.items():
-
-        # The image value has no replace capability so we have to skip it
-        if key != "image" and key != "image_content" and key != "has_duplicates":
-            character_cleaned[key] = value.replace("\n", "")
-
-    if example is None:
-        example = get_examples_html(character_cleaned["traditional"], is_server=False)
-
-    # The only if conditions ensure that if a field is missing because it isn't part of a page that an error
-    # isn't thrown.
-    return  \
-        character_cleaned["traditional"] + delimiter + \
-        character_cleaned["simplified"] + delimiter + \
-        character_cleaned["defs"] + delimiter + \
-        character_cleaned["pinyin"] + delimiter + \
-        character_cleaned["soundword"] + delimiter + \
-        "<img src=\"" + image_file_name + "\" />" + delimiter + \
-        character_cleaned["mnemonics"] + delimiter + \
-        character_cleaned["story"] + delimiter + \
-        character_cleaned["examples"] + "<hr>" + example + delimiter + \
-        character_cleaned["additionalinfo"] + delimiter + \
-        character_cleaned["simplifiedcomponents"] + delimiter + \
-        character_cleaned["traditionalcomponents"]
-
-
-def output_characters(chars_output_file_name, char_images_folder, char_list, delimiter, example=None, online=False):
-    """
-    Outputs the new characters to a file for import into Anki
-
-    :param str chars_output_file_name: The name of the file to which we want to write the new characters
-    :param str char_images_folder: The folder which will store the images associated with the character images
-    :param list char_list: The list of characters we want to write to file
-    :param str delimiter: The delimiter you want to use for your flashcards
-    :param str example: The HTML for the example text
-    :param bool online: Used to determine if this is being output from the server or from the command line
-    :return: Returns nothing
-    """
-
-    logging.info("Outputting characters.")
-
-    # Create target directory if don't exist
-    if not os.path.exists(char_images_folder):
-        os.mkdir(char_images_folder)
-        logging.info("Directory " + char_images_folder + " Created ")
-
-    if online:
-        mode = 'a+'
-    else:
-        mode = 'w'
-
-    with open(chars_output_file_name, mode, encoding="utf-8-sig") as output_file:
-
-        for character in char_list:
-
-            # Write the image for the character out to disk.
-            with open(create_image_name(character, char_images_folder), "wb") as img_file:
-                img_file.write(character["image_content"])  # Output the image to disk
-
-            character_line = _get_character_line(character, create_image_name(character), delimiter,
-                                                 example.replace("\n", ""))
-
-            output_file.write(character_line + "\n")
-
-            if logging.getLogger().level == logging.DEBUG:
-                logging.debug("\n-------------------------------------------\n")
-                logging.debug(character_line + "\n")
-                logging.debug("\n-------------------------------------------\n")
-            else:
-                logging.info("Writing the character: " + character["traditional"])
-
-
 def output_combined(output_file_name, char_images_folder, word_list, delimiter, thread_count):
     """
     Allows you to output flashcards with both the word and the character embedded in them.
@@ -508,22 +380,20 @@ def output_combined_online(word, output_file_name, delimiter, char_line, example
         output_file.write((example_line.replace('\n', "") + "\n").replace(delimiter, ""))
 
 
-def get_words(words, ebook=None, skip_choices=False, select_closest_match=False):
+def get_words(words, ebook=None, skip_choices=False):
     """
     Reaches out to www.mdbg.net and grabs the data for each of the words on which you want data or searches an
     instance of Chinese Blockbust eBook for characters.
 
     :param list words: The list of the words you want to add
     :param ebook ebook: An eBook file object
-    :param bool skip_choices: Whether you want to skip selection of the different possible options
-    :param bool select_closest_match: Instead of skipping the choices it will just automatically select the first choice
-                              available
+    :param bool skip_choices: Whether you want to skip selection of the different possible options. The closest match
+                              will be selected instead.
     :return: Returns two lists, one with the words found and the other with the characters found
-    :rtype: tuple of lists
+    :rtype: list
     """
 
     new_words = []  # type: list
-    new_chars = []  # type: list
 
     if ebook:
 
@@ -537,23 +407,9 @@ def get_words(words, ebook=None, skip_choices=False, select_closest_match=False)
 
             try:
                 word = word.strip()  # type: str
-
-                # Handle words and characters differently. For individual characters, there is a special feature for
-                # looking them up in the book Chinese Blockbuster and making flashcards. This will only be active if
-                # the ebook_path is provided on the command line.
-                if len(word) < 2 and ebook is not None:
-                    new_char = process_char_entry(ebook, word)
-                    if new_char is not None:
-                        if len(new_char) > 1:
-                            for character in new_char:
-                                new_chars.append(character)
-                        else:
-                            new_chars.append(new_char[0])
-                else:
-                    new_word = process_word(word, skip_choices=skip_choices, ebook=ebook,
-                                            select_closest_match=select_closest_match)
-                    if new_word:
-                        new_words.append(new_word)
+                new_word = process_word(word, skip_choices=skip_choices, ebook=ebook)
+                if new_word:
+                    new_words.append(new_word)
 
             except KeyboardInterrupt:
                 if not query_yes_no("You have pressed ctrl+C. Are you sure you want to exit?"):
@@ -573,12 +429,10 @@ def get_words(words, ebook=None, skip_choices=False, select_closest_match=False)
                         "Do you want to continue with the next word?"):
                     exit(1)
 
-    if len(new_chars) < 1:
-        new_chars = None
     if len(new_words) < 1:
         new_words = None
 
-    return new_words, new_chars
+    return new_words
 
 
 def process_word_entry(entry, ebook=None):
@@ -647,15 +501,14 @@ def process_word_entry(entry, ebook=None):
     return organized_entry
 
 
-def process_word(word, skip_choices=False, ebook=None, select_closest_match=False):
+def process_word(word, skip_choices=False, ebook=None):
     """
     Processes a word in the list of words
 
     :param str word: The word from the list
-    :param skip_choices: Whether we should skip prompting the user if there are multiple choices or not
+    :param skip_choices: Instead of skipping the choices it will just automatically select the closest
+                         match
     :param ebook ebook: An eBook file object
-    :param bool select_closest_match: Instead of skipping the choices it will just automatically select the closest
-                                      match
     :return: Returns a dictionary containing the word's entry
     :rtype: dict
     """
@@ -679,7 +532,7 @@ def process_word(word, skip_choices=False, ebook=None, select_closest_match=Fals
 
     if len(entries) > 1:
 
-        if select_closest_match or skip_choices:
+        if skip_choices:
             # We use the simplified to avoid the one to many problem.
             simplified_word = HanziConv.toSimplified(word)
 
