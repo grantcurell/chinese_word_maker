@@ -536,7 +536,7 @@ def process_word(word, skip_choices=False, ebook=None):
             # We use the simplified to avoid the one to many problem.
             simplified_word = HanziConv.toSimplified(word)
 
-            selection = 1
+            selection = 0
             exact_match = False
 
             logging.info(str(len(entries)) + " found from mdbg.net. Finding the closest match.")
@@ -550,15 +550,32 @@ def process_word(word, skip_choices=False, ebook=None):
                         selection = index + 1
                         logging.info("Found exact match. Selecting " + entry["simplified"])
                         exact_match = True
-                        break
+
+                        # Preference definitions which aren't a surname. A lot of the first definitions are surnames
+                        # and we don't want those.
+                        is_surname_def = False
+                        for definition in entry["defs"]:
+                            if "surname" in str(definition).lower():
+                                is_surname_def = True
+                        if not is_surname_def:
+                            break
                 elif entry["traditional"] == simplified_word:
                     selection = index + 1
                     logging.info("Found exact match. Selecting " + entry["traditional"])
                     exact_match = True
-                    break
+
+                    # Preference definitions which aren't a surname. A lot of the first definitions are surnames
+                    # and we don't want those.
+                    is_surname_def = False
+                    for definition in entry["defs"]:
+                        if "surname" in str(definition).lower():
+                            is_surname_def = True
+                    if not is_surname_def:
+                        break
 
             if not exact_match:
                 logging.info("Did not find an exact match. Selecting first entry.")
+                selection = 1
 
         else:
             print("It looks like there are multiple definitions for this word available. "
