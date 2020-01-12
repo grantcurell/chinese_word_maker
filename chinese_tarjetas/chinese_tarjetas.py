@@ -553,11 +553,11 @@ def process_word(word, skip_choices=False, ebook=None):
 
                         # Preference definitions which aren't a surname. A lot of the first definitions are surnames
                         # and we don't want those.
-                        is_surname_def = False
+                        is_useless_def = False
                         for definition in entry["defs"]:
-                            if "surname" in str(definition).lower():
-                                is_surname_def = True
-                        if not is_surname_def:
+                            if "surname" in str(definition).lower() or "variant of" in str(definition).lower() or str(definition).lower().startswith("see "):
+                                is_useless_def = True
+                        if not is_useless_def:
                             break
                 elif entry["traditional"] == simplified_word:
                     selection = index + 1
@@ -566,11 +566,11 @@ def process_word(word, skip_choices=False, ebook=None):
 
                     # Preference definitions which aren't a surname. A lot of the first definitions are surnames
                     # and we don't want those.
-                    is_surname_def = False
+                    is_useless_def = False
                     for definition in entry["defs"]:
-                        if "surname" in str(definition).lower():
-                            is_surname_def = True
-                    if not is_surname_def:
+                        if "surname" in str(definition).lower() or "variant of" in str(definition).lower() or str(definition).lower().startswith("see "):
+                            is_useless_def = True
+                    if not is_useless_def:
                         break
 
             if not exact_match:
