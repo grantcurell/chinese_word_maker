@@ -606,7 +606,9 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
         if exact_match and not found_second:
             logging.info("Selected " + str(entries[selection - 1]["traditional"]))
             entries[selection - 1]["final_traditional"] = entries[selection - 1]["traditional"]
-            entry_list.append(entries[selection - 1])
+
+            # Re-initialize the list, wiping anything that might have been it (prevents duplicate values)
+            entry_list = [entries[selection - 1]]
 
     if (ask_if_match_not_found and match_not_found) or not skip_choices:
         print("It looks like there are multiple definitions for " + word + " available. "
