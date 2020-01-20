@@ -1,7 +1,7 @@
 __author__ = "Grant Curell"
 __copyright__ = "Do what you want with it"
 __license__ = "GPLv3"
-__version__ = "1.5"
+__version__ = "1.5.1"
 __maintainer__ = "Grant Curell"
 
 from ebooklib import epub
@@ -31,6 +31,11 @@ def main():
                              'images associated with character images.')
     parser.add_argument('--skip-choices', dest="skip_choices", required=False, action='store_true', default=False,
                         help='This option will tell the program to just select the closest match for the word.')
+    parser.add_argument('--ask-if-match-not-found', dest="ask_if_match_not_found", required=False, action='store_true',
+                        default=False, help='Will only ask for input if an exact match between the pinyin and a '
+                                            'character isn\'t found.')
+    parser.add_argument('--allow-online-choices', dest="allow_online_choices", required=False, action='store_true',
+                        default=False, help='Enables command line choices with the server running.')
     parser.add_argument('--ebook-path', metavar='EBOOK_PATH', dest="ebook_path", required=False, type=str,
                         default="combined.epub", help='A path to Chinese Blockbuster in EPUB format. In my case, I '
                                                       'bought all of them and merged them into one big book.')
@@ -75,6 +80,9 @@ def main():
         print('\nMapping for "Chinse Words Updated" is:')
         print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
         exit(0)
+
+    if args.ask_if_match_not_found:
+        args.skip_choices = True
 
     # Change path depending on whether we are on Windows or Linux
     if args.use_media_folder or args.chars_image_folder is None:
@@ -131,12 +139,17 @@ def main():
         else:
             app.config['SCHOLARLY'] = False
 
+        if args.allow_online_choices:
+            app.config['ONLINE_CHOICES'] = True
+        else:
+            app.config['ONLINE_CHOICES'] = False
+
         app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
         app.run(host='0.0.0.0', port=args.port)
         driver.close()
     elif args.single_word:
 
-        words = get_words(args.single_word, app.config["ebook"], args.skip_choices)
+        words = get_words(args.single_word, app.config["ebook"], args.skip_choices, args.ask_if_match_not_found)
 
         output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
                         thread_count=args.thread_count)

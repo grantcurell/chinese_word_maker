@@ -305,7 +305,7 @@ def _get_word_line(word, delimiter):
     :rtype: str
     """
 
-    return word["traditional"] + delimiter + word["simplified"] + delimiter + word["pinyin"] + delimiter + \
+    return word["final_traditional"] + delimiter + word["simplified"] + delimiter + word["pinyin"] + delimiter + \
            "<br>".join(word["defs"]).replace(delimiter, "") + delimiter + word["hsk"].replace(" ", "")
 
 
@@ -344,11 +344,11 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
                     if word_processed is not None:
                         examples[word_processed["traditional"]] = future.result()
                     else:
-                        logging.info("No examples found for word: " + word_processed["traditional"])
+                        logging.info("No examples found for word: " + word_processed["final_traditional"])
                 except Exception as exc:
-                    logging.error('%r generated an exception: %s' % (word_processed["traditional"], exc))
+                    logging.error('%r generated an exception: %s' % (word_processed["final_traditional"], exc))
                 else:
-                    logging.info('Finished processing word %s' % word_processed["traditional"])
+                    logging.info('Finished processing word %s' % word_processed["final_traditional"])
 
                 i = i + 1
 
@@ -365,7 +365,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
             try:
                 line = examples[word["traditional"]].replace('\n', "") + "\n"
             except KeyError:
-                logging.debug("No examples found for word: " + word["traditional"])
+                logging.debug("No examples found for word: " + word["final_traditional"])
             i = i + 1
 
             output_file.write(line.replace(delimiter, ""))
@@ -380,7 +380,7 @@ def output_combined_online(word, output_file_name, delimiter, char_line, example
         output_file.write((example_line.replace('\n', "") + "\n").replace(delimiter, ""))
 
 
-def get_words(words, ebook=None, skip_choices=False):
+def get_words(words, ebook=None, skip_choices=False, ask_if_match_not_found=True, combine_exact_defs=False):
     """
     Reaches out to www.mdbg.net and grabs the data for each of the words on which you want data or searches an
     instance of Chinese Blockbust eBook for characters.
@@ -389,6 +389,9 @@ def get_words(words, ebook=None, skip_choices=False):
     :param ebook ebook: An eBook file object
     :param bool skip_choices: Whether you want to skip selection of the different possible options. The closest match
                               will be selected instead.
+    :param bool ask_if_match_not_found: The program will first try to skip all choices, but if it can't find a match
+                                         it will ask.
+    :param bool combine_exact_defs: Used if you want to just return a definition for everything with an exact match.
     :return: Returns two lists, one with the words found and the other with the characters found
     :rtype: list
     """
@@ -407,9 +410,12 @@ def get_words(words, ebook=None, skip_choices=False):
 
             try:
                 word = word.strip()  # type: str
-                new_word = process_word(word, skip_choices=skip_choices, ebook=ebook)
-                if new_word:
-                    new_words.append(new_word)
+
+                for word_entry in process_word(word, skip_choices=skip_choices, ebook=ebook,
+                                               ask_if_match_not_found=ask_if_match_not_found,
+                                               combine_exact_defs=combine_exact_defs):
+                    if word_entry:
+                        new_words.append(word_entry)
 
             except KeyboardInterrupt:
                 if not query_yes_no("You have pressed ctrl+C. Are you sure you want to exit?"):
@@ -477,7 +483,7 @@ def process_word_entry(entry, ebook=None):
         # Loop over every character which is part of the word
         for character in organized_entry["traditional"]:
 
-            logging.info("Searching for " + organized_entry["traditional"] + "'s character components.")
+            logging.debug("Searching for " + organized_entry["traditional"] + "'s character components.")
 
             individual_characters = process_char_entry(ebook, character)
 
@@ -491,7 +497,7 @@ def process_word_entry(entry, ebook=None):
             if individual_characters:
                 for individual_character in individual_characters:
                     if individual_character["pinyin_text"] in organized_entry["pinyin"]:
-                        logging.info("Found a match!")
+                        logging.debug("Found a match to a character with that exact pronunciation!")
                         organized_entry["characters"].append(individual_character)
                         exact_match_found = True
 
@@ -501,7 +507,8 @@ def process_word_entry(entry, ebook=None):
     return organized_entry
 
 
-def process_word(word, skip_choices=False, ebook=None):
+def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=True, skip_if_not_exact=True,
+                 combine_exact_defs=False):
     """
     Processes a word in the list of words
 
@@ -509,6 +516,10 @@ def process_word(word, skip_choices=False, ebook=None):
     :param skip_choices: Instead of skipping the choices it will just automatically select the closest
                          match
     :param ebook ebook: An eBook file object
+    :param bool ask_if_match_not_found: The program will first try to skip all choices, but if it can't find a match
+                                         it will ask.
+    :param bool skip_if_not_exact: Skip if an exact match isn't found.
+    :param bool combine_exact_defs: Used if you want to just return a definition for everything with an exact match.
     :return: Returns a dictionary containing the word's entry
     :rtype: dict
     """
@@ -527,82 +538,110 @@ def process_word(word, skip_choices=False, ebook=None):
 
     entries = []  # type: list
 
+    entry_list = [] # Used to return the entries we found.
+
     for entry in results:
         entries.append(process_word_entry(entry, ebook))
 
-    if len(entries) > 1:
+    match_not_found = False
 
-        if skip_choices:
-            # We use the simplified to avoid the one to many problem.
-            simplified_word = HanziConv.toSimplified(word)
+    if skip_choices:
+        # We use the simplified to avoid the one to many problem.
+        simplified_word = HanziConv.toSimplified(word)
 
-            selection = 0
-            exact_match = False
+        selection = 0
+        exact_match = False
+        found_second = False
 
-            logging.info(str(len(entries)) + " found from mdbg.net. Finding the closest match.")
-            for index, entry in enumerate(entries):
-                logging.info("\n-------- Option " + str(index + 1) + "---------\n")
-                logging.info(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
+        logging.info(str(len(entries)) + " found from mdbg.net. Finding the closest match for " + word + ".")
+        for index, entry in enumerate(entries):
+            logging.debug("\n-------- Option " + str(index + 1) + "---------\n")
+            logging.debug(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
 
-            for index, entry in enumerate(entries):
-                if entry["simplified"].strip() != "":
-                    if entry["simplified"] == simplified_word:
-                        selection = index + 1
-                        logging.info("Found exact match. Selecting " + entry["simplified"])
-                        exact_match = True
+        for index, entry in enumerate(entries):
+            if entry["traditional"] == simplified_word or entry["simplified"].strip() == simplified_word:
+                logging.debug("Found exact match. Selecting " + entry["traditional"])
 
-                        # Preference definitions which aren't a surname. A lot of the first definitions are surnames
-                        # and we don't want those.
-                        is_useless_def = False
-                        for definition in entry["defs"]:
-                            if "surname" in str(definition).lower() or "variant of" in str(definition).lower() \
-                                    or str(definition).lower().startswith("see "):
-                                is_useless_def = True
-                        if not is_useless_def:
-                            break
-                elif entry["traditional"] == simplified_word:
-                    selection = index + 1
-                    logging.info("Found exact match. Selecting " + entry["traditional"])
+                # If this is already true then it means we found more than one exact match.
+                if not exact_match:
                     exact_match = True
+                else:
+                    found_second = True
 
+                selection = index + 1
+
+                if combine_exact_defs and not ask_if_match_not_found:
+                    entry_list.append(entry)
+                else:
                     # Preference definitions which aren't a surname. A lot of the first definitions are surnames
                     # and we don't want those.
-                    is_useless_def = False
                     for definition in entry["defs"]:
-                        if "surname" in str(definition).lower() or "variant of" in str(definition).lower() \
-                                or str(definition).lower().startswith("see "):
-                            is_useless_def = True
-                    if not is_useless_def:
-                        break
+                        if "surname" not in str(definition).lower() and "variant of" not in str(definition).lower() \
+                                and str(definition).lower().startswith("see "):
 
-            if not exact_match:
-                logging.info("Did not find an exact match. Selecting first entry.")
+                            # This is only added because the first definition is typically preferable.
+                            if not found_second:
+                                selection = index + 1
+
+        if not exact_match:
+
+            if skip_if_not_exact:
+                return []
+            else:
                 selection = 1
+                match_not_found = True
+                if not ask_if_match_not_found:
+                    logging.info("Did not find an exact match. Selecting first entry.")
+                    logging.info("Selected " + str(entries[selection]["traditional"]))
+                else:
+                    logging.info("Could not find an exact match. Prompting user for input.")
 
-        else:
-            print("It looks like there are multiple definitions for this word available. "
-                  "Which one would you like to use?")
+        # We found multiple exact matches.
+        if exact_match and found_second:
+            selection = 1
+            match_not_found = True
+            logging.info("Found multiple possible matches to " + word + ", prompting for user input.")
 
-            print("\n\n-------- Option 0 ---------\n")
-            print("Type 0 to skip.")
+        # We found an exact match and there was on second match so no manual intervention is required.
+        if exact_match and not found_second:
+            logging.info("Selected " + str(entries[selection - 1]["traditional"]))
+            entries[selection - 1]["final_traditional"] = entries[selection - 1]["traditional"]
+            entry_list.append(entries[selection - 1])
 
-            for index, entry in enumerate(entries):
+    if (ask_if_match_not_found and match_not_found) or not skip_choices:
+        print("It looks like there are multiple definitions for " + word + " available. "
+              "Which one would you like to use?")
+
+        print("\n\n-------- Option 0 ---------\n")
+        print("Type 0 to skip.")
+
+        for index, entry in enumerate(entries):
+            if entry["traditional"] == simplified_word or entry["simplified"].strip() == simplified_word:
                 print("\n-------- Option " + str(index + 1) + "---------\n")
                 print(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
 
-            print("\n\n")
-            selection = -1  # type: int
+        print("\n\n")
+        selection = -2  # type: int
 
-            while (selection > len(entries) or selection < 1) and selection != 0:
-                selection = int(input("Enter your selection: "))
+        print("You may enter multiple selections. Enter them one after another. Type -1 to end.")
+        while selection != -1 and selection != 0:
+            selection = int(input("Enter your selection: "))
 
-        if selection != 0:
-            return entries[selection - 1]
+            length = len(entries)
+
+            if len(entries) >= selection > 0:
+                if entries[selection - 1] not in entry_list:
+                    entry_list.append(entries[selection - 1])
+
+    if selection != 0:
+        if len(entry_list) > 1:
+            for index, entry in enumerate(entry_list):
+                entry["final_traditional"] = "(" + str(index + 1) + ") " + entry["traditional"]
         else:
-            return None
-
-    elif len(entries) == 1:
-        return entries[0]
+            entry_list[0]["final_traditional"] = entry_list[0]["traditional"]
+        return entry_list
+    else:
+        return []
 
 
 def resolve_href(href, book):
@@ -652,8 +691,8 @@ def process_char_entry(book, char):
     :rtype: list of dict - Returns a list of dictionaries containing all the attributes of a character
     """
 
-    logging.info("-------------------------------------")
-    logging.info("Processing character: " + char)
+    logging.debug("-------------------------------------")
+    logging.debug("Processing character: " + char)
 
     # Used to track whether we found the character
     found_char = False
@@ -716,7 +755,7 @@ def process_char_entry(book, char):
                     #     else:
                     atag.extract()
 
-                logging.info("Found character " + char + " in the book!")
+                logging.debug("Found character " + char + " in the book!")
 
                 character_header = character_header.text.split('[')
 
@@ -809,7 +848,7 @@ def process_char_entry(book, char):
                     if content is not None:
                         organized_entry["traditionalcomponents"] = str(content.find_next())
                     else:
-                        logging.info("No components found for character " + char + ".")
+                        logging.debug("No components found for character " + char + ".")
 
                 # I noticed some elements didn't strictly adhere to having header information. This is an exception
                 # I wrote specifically for definitions.
@@ -860,5 +899,5 @@ def process_char_entry(book, char):
         logging.warning("Did not find character " + char + " in the book!")
         return None
 
-    logging.info("Found all of character " + char + "'s information")
+    logging.debug("Found all of character " + char + "'s information")
     return organized_entries_list

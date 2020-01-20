@@ -26,69 +26,76 @@ def _lookup_character():
 
     executor = ThreadPoolExecutor(max_workers=4)
 
-    get_words_future = executor.submit(get_words, [input_word], app.config["ebook"], skip_choices=True)
+    get_words_future = executor.submit(get_words, [input_word], app.config["ebook"],
+                                       skip_choices=not(app.config['ONLINE_CHOICES']),
+                                       ask_if_match_not_found=app.config['ONLINE_CHOICES'],
+                                       combine_exact_defs=not(app.config['ONLINE_CHOICES']))
     if app.config['SCHOLARLY']:
         example_future = executor.submit(get_examples_scholarly_html, input_word_traditional)
     else:
         example = get_examples_html(input_word_simplified, driver=app.config['DRIVER'])
 
     if get_words_future.result() is not None:
-        word = get_words_future.result()
+        words = get_words_future.result()
     else:
         return 'Uh oh. The server went and pooped itself. Investigate the logs for more info.'
 
-    if word is None:
+    if words is None:
         return 'No results were found for that word.'
     else:
 
-        if word is not None:
+        for word in words:
 
-            if len(word[0]["traditional"]) == 1 and len(input_word) > 1:
-                return 'No results were found for that word.'
+            if word is not None:
 
-            # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen
-            # relatively infrequently so we should still get a net time save.
-            if input_word_traditional != word[0]["traditional"]:
-                logging.warning(
-                    "We used some heuristics to convert from Simplified to Traditional Chinese. It looks like "
-                    "on further evaluation they failed. This is not fatal and will be automatically fixed, but "
-                    "we must make a new web request which will take a few seconds.")
-                logging.warning("The original search was for " + input_word + " which was converted to " +
-                                input_word_traditional + " but mdbg.net returned " + word[0]["traditional"])
-                example_future = executor.submit(get_examples_scholarly_html, word[0]["traditional"])
+                if len(word["traditional"]) == 1 and len(input_word) > 1:
+                    return 'No results were found for that word.'
 
-            logging.info("Performing character lookup for " + word[0]["traditional"])
+                # Make sure that heuristics succeeded and we don't fail to convert for a one to many. This should happen
+                # relatively infrequently so we should still get a net time save.
+                if input_word_traditional != word["traditional"]:
+                    logging.warning(
+                        "We used some heuristics to convert from Simplified to Traditional Chinese. It looks like "
+                        "on further evaluation they failed. This is not fatal and will be automatically fixed, but "
+                        "we must make a new web request which will take a few seconds.")
+                    logging.warning("The original search was for " + input_word + " which was converted to " +
+                                    input_word_traditional + " but mdbg.net returned " + word["traditional"])
+                    example_future = executor.submit(get_examples_scholarly_html, word["traditional"])
 
-            char_future_server = executor.submit(get_chars_html, word[0]["characters"], server_mode=True)
-            char_future = executor.submit(get_chars_html, word[0]["characters"],
-                                          image_location=app.config['IMAGE_FOLDER'], server_mode=False)
+                logging.info("Performing character lookup for " + word["traditional"])
 
-            webpage += render_template("word.html", word=word[0]) + "<hr>"
-            webpage += char_future_server.result()
+                char_future_server = executor.submit(get_chars_html, word["characters"], server_mode=True)
+                char_future = executor.submit(get_chars_html, word["characters"],
+                                              image_location=app.config['IMAGE_FOLDER'], server_mode=False)
 
-            logging.info("Waiting on example to return.")
-            if app.config['SCHOLARLY']:
-                example = example_future.result()
+                webpage += render_template("word.html", word=word) + "<hr>"
+                webpage += char_future_server.result()
 
-            webpage += example
+                logging.info("Waiting on example to return.")
+                if app.config['SCHOLARLY']:
+                    example = example_future.result()
 
-            if not do_not_save_word_is_checked:
-                output_combined_online(word[0], app.config['OUTPUT_FILE'], app.config['DELIMITER'],
-                                           char_future.result(), example)
+                webpage += example
 
-            if not path.exists('word_searches.txt'):
-                with open('word_searches.txt', 'w'):
-                    pass
+                if not do_not_save_word_is_checked:
+                    output_combined_online(word, app.config['OUTPUT_FILE'], app.config['DELIMITER'],
+                                               char_future.result(), example)
 
-            with open("word_searches.txt", "r", encoding="utf-8-sig") as file:
-                word_file_contents = file.read()
+                if not path.exists('word_searches.txt'):
+                    with open('word_searches.txt', 'w'):
+                        pass
 
-                if (not word[0]["simplified"] and word[0]["traditional"] not in word_file_contents) or \
-                        (word[0]["traditional"] not in word_file_contents and word[0]["simplified"]
-                         not in word_file_contents):
+                with open("word_searches.txt", "r", encoding="utf-8-sig") as file:
+                    word_file_contents = file.read()
 
-                    with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
-                        word_file.write(word[0]["traditional"] + "\n")
+                    if (not word["simplified"] and word["traditional"] not in word_file_contents) or \
+                            (word["traditional"] not in word_file_contents and word["simplified"]
+                             not in word_file_contents):
+
+                        with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
+                            word_file.write(word["traditional"] + "\n")
+
+            webpage += "<hr>"
 
         return webpage
 
