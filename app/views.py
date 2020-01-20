@@ -95,7 +95,7 @@ def _lookup_character():
                         with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
                             word_file.write(word["traditional"] + "\n")
 
-            webpage += "<hr>"
+            webpage += '<hr style="height:3px;border:none;color:#333;background-color:#333;" />'
 
         return webpage
 
