@@ -354,6 +354,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
 
         logging.info("Finished getting all examples.")
 
+        logging.info("Writing words.")
         for word in word_list:
 
             output_file.write(_get_word_line(word, delimiter) + delimiter)
@@ -562,26 +563,28 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
             if entry["traditional"] == simplified_word or entry["simplified"].strip() == simplified_word:
                 logging.debug("Found exact match. Selecting " + entry["traditional"])
 
-                # If this is already true then it means we found more than one exact match.
-                if not exact_match:
-                    exact_match = True
-                else:
-                    found_second = True
+                useless_definition = False
 
-                selection = index + 1
+                for definition in entry["defs"]:
+                    if "surname" in str(definition).lower() or "variant of" in str(definition).lower() \
+                            or str(definition).lower().startswith("see "):
+                        useless_definition = True
+                        entries.remove(entry)
 
-                if combine_exact_defs and not ask_if_match_not_found:
-                    entry_list.append(entry)
-                else:
-                    # Preference definitions which aren't a surname. A lot of the first definitions are surnames
-                    # and we don't want those.
-                    for definition in entry["defs"]:
-                        if "surname" not in str(definition).lower() and "variant of" not in str(definition).lower() \
-                                and str(definition).lower().startswith("see "):
+                if not useless_definition:
 
-                            # This is only added because the first definition is typically preferable.
-                            if not found_second:
-                                selection = index + 1
+                    # If this is already true then it means we found more than one exact match.
+                    if not exact_match:
+                        exact_match = True
+                    else:
+                        found_second = True
+
+                    if combine_exact_defs and not ask_if_match_not_found:
+                        entry_list.append(entry)
+
+                    # This is only added because the first definition is typically preferable.
+                    if not found_second:
+                        selection = index + 1
 
         if not exact_match:
 
