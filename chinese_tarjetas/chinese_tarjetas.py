@@ -67,12 +67,13 @@ def create_image_name(organized_entry, image_location=""):
         return file_name + "-" + organized_entry["pinyin_text"] + '.' + file_extension
 
 
-def get_examples_html(word, driver=None, is_server=True):
+def get_examples_html(word, word_pinyin, driver=None, is_server=True):
     """
     Reach out to https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=%E4%B8%BA%E7%9D%80
     and get example sentences.
 
     :param str word: The word, in traditional character format, for which you want to retrieve examples
+    :param str word_pinyin: The pinyin of the word - to make sure if there are multiple variants you get a matching variant
     :param selenium.webdriver.chrome.webdriver.WebDriver driver: The webdriver we want to use to generate the example
     :param bool is_server: Determines if the function is being called from a server or not.
     :return Returns a template string with all of the examples formatted within it.
@@ -91,12 +92,20 @@ def get_examples_html(word, driver=None, is_server=True):
 
     driver.get(url_string)
 
+    i = 0
+
     # This forces Chrome to wait to return until an element with class name autolink appears. Autolink in this case
-    #
-    try:
-        driver.find_element_by_class_name("autolink")
-    except NoSuchElementException:
-        return "No examples found for that word or finding an example took longer than 5 seconds."
+    # Autolink is the name of the span class in the examples.
+    while i < 2:
+        try:
+            driver.find_element_by_class_name("autolink")
+            i = 2
+        except NoSuchElementException:
+            if i < 2:
+                i + 1
+                driver.get(url_string)
+            else:
+                return "No examples found for that word or finding an example took longer than 5 seconds."
 
     html = driver.page_source
 
@@ -128,9 +137,10 @@ def get_examples_html(word, driver=None, is_server=True):
             .replace("hl", "highlight")
         translation = data.find("p", {"class": "trans"}).text
 
-        examples.append((chinese_sentence, pinyin, translation))
-
-        i = i + 1
+        if word_pinyin in pinyin:
+            examples.append((chinese_sentence, pinyin, translation))
+            i = i + 1
+            logging.debug("Character pinyin did not match example. Skipping this example.")
 
     env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
     template = env.get_template("examples.html")
@@ -331,8 +341,8 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
         # forever.
         with ThreadPoolExecutor(max_workers=thread_count) as executor:
 
-            future_example = {executor.submit(get_examples_html, word["traditional"], is_server=False): word for word
-                              in word_list}
+            future_example = {executor.submit(get_examples_html, word["simplified"], word["pinyin"], is_server=False):
+                              word for word in word_list}
 
             length = str(len(word_list))
             i = 1

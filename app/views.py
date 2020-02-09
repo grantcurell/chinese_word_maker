@@ -30,10 +30,9 @@ def _lookup_character():
                                        skip_choices=not(app.config['ONLINE_CHOICES']),
                                        ask_if_match_not_found=app.config['ONLINE_CHOICES'],
                                        combine_exact_defs=not(app.config['ONLINE_CHOICES']))
+
     if app.config['SCHOLARLY']:
         example_future = executor.submit(get_examples_scholarly_html, input_word_traditional)
-    else:
-        example = get_examples_html(input_word_simplified, driver=app.config['DRIVER'])
 
     if get_words_future.result() is not None:
         words = get_words_future.result()
@@ -74,6 +73,8 @@ def _lookup_character():
                 logging.info("Waiting on example to return.")
                 if app.config['SCHOLARLY']:
                     example = example_future.result()
+                else:
+                    example = get_examples_html(input_word_simplified, word["pinyin"], driver=app.config['DRIVER'])
 
                 webpage += example
 
