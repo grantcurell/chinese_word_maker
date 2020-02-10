@@ -27,17 +27,19 @@ def _lookup_character():
     executor = ThreadPoolExecutor(max_workers=4)
 
     get_words_future = executor.submit(get_words, [input_word], app.config["ebook"],
-                                       skip_choices=not(app.config['ONLINE_CHOICES']),
+                                       skip_choices=not (app.config['ONLINE_CHOICES']),
                                        ask_if_match_not_found=app.config['ONLINE_CHOICES'],
-                                       combine_exact_defs=not(app.config['ONLINE_CHOICES']))
+                                       combine_exact_defs=not (app.config['ONLINE_CHOICES']))
 
     if app.config['SCHOLARLY']:
         example_future = executor.submit(get_examples_scholarly_html, input_word_traditional)
+    else:
+        example_future = None
 
     if get_words_future.result() is not None:
         words = get_words_future.result()
     else:
-        return 'Uh oh. The server went and pooped itself. Investigate the logs for more info.'
+        return 'Could not find that word.'
 
     if words is None:
         return 'No results were found for that word.'
@@ -80,7 +82,7 @@ def _lookup_character():
 
                 if not do_not_save_word_is_checked:
                     output_combined_online(word, app.config['OUTPUT_FILE'], app.config['DELIMITER'],
-                                               char_future.result(), example)
+                                           char_future.result(), example)
 
                 if not path.exists('word_searches.txt'):
                     with open('word_searches.txt', 'w'):
@@ -92,7 +94,6 @@ def _lookup_character():
                     if (not word["simplified"] and word["traditional"] not in word_file_contents) or \
                             (word["traditional"] not in word_file_contents and word["simplified"]
                              not in word_file_contents):
-
                         with open("word_searches.txt", "a+", encoding="utf-8-sig") as word_file:
                             word_file.write(word["traditional"] + "\n")
 

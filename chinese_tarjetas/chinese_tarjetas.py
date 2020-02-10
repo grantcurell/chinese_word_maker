@@ -8,6 +8,7 @@ from hanziconv import HanziConv
 from googletrans import Translator
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
+import bs4
 import concurrent.futures
 import ebooklib
 import traceback
@@ -73,13 +74,17 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=2
     and get example sentences.
 
     :param str word: The word, in traditional character format, for which you want to retrieve examples
-    :param str word_pinyin: The pinyin of the word - to make sure if there are multiple variants you get a matching variant
+    :param str word_pinyin: The pinyin of the word - to make sure if there are multiple variants you get a matching
+                            variant
     :param selenium.webdriver.chrome.webdriver.WebDriver driver: The webdriver we want to use to generate the example
     :param bool is_server: Determines if the function is being called from a server or not.
     :param int max_page: The maximum number of pages in which to search for examples
     :return Returns a template string with all of the examples formatted within it.
     :rtype str
     """
+
+    template = None
+
     logging.info("Creating an example for " + word)
 
     logging.info("Requested word is: " + word)
@@ -103,7 +108,7 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=2
             i = 2
         except NoSuchElementException:
             if i < 2:
-                i + 1
+                i = i + 1
                 driver.get(url_string)
             else:
                 return "No examples found for that word or finding an example took longer than 5 seconds."
@@ -138,7 +143,7 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=2
             chinese_sentence = "".join(chinese_sentence).replace(word, "<em class=\"highlight\">" + word + "</em>")
 
             # I know the way I did this is gross. Sue me.
-            pinyin = str(data.find("p", {"class": "pinyin"})).replace("<p class=\"pinyin\">", "").replace("</p>", "")\
+            pinyin = str(data.find("p", {"class": "pinyin"})).replace("<p class=\"pinyin\">", "").replace("</p>", "") \
                 .replace("hl", "highlight")
             translation = data.find("p", {"class": "trans"}).text
 
@@ -178,7 +183,10 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=2
                 else:
                     "No examples found for that word or finding an example took longer than 5 seconds."
 
-    return template.render(examples=examples)
+    if template is None:
+        return None
+    else:
+        return template.render(examples=examples)
 
 
 def get_examples_scholarly_html(word):
@@ -207,7 +215,7 @@ def get_examples_scholarly_html(word):
         tag.decompose()
 
     # Get the results table specifically
-    table = bs.find(lambda tag: tag.name == 'table' and tag.has_attr('width') and tag['width'] == "100%")
+    table = bs.find(lambda t_tag: t_tag.name == 'table' and t_tag.has_attr('width') and t_tag['width'] == "100%")
 
     if table is None:
         logging.info("No examples found for " + word)
@@ -237,6 +245,8 @@ def get_examples_scholarly_html(word):
 
     translator = Translator()
     i = 0
+
+    translation = None
 
     # This grabs the first element of every result which in our case is just the original traditional Chinese text
     for text_to_translate in [item[0] for item in results]:
@@ -375,7 +385,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
         with ThreadPoolExecutor(max_workers=thread_count) as executor:
 
             future_example = {executor.submit(get_examples_html, word["simplified"], word["pinyin"], is_server=False):
-                              word for word in word_list}
+                                  word for word in word_list}
 
             length = str(len(word_list))
             i = 1
@@ -416,9 +426,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
 
 
 def output_combined_online(word, output_file_name, delimiter, char_line, example_line):
-
     with open(output_file_name, 'a+', encoding="utf-8-sig") as output_file:
-
         output_file.write(_get_word_line(word, delimiter) + delimiter)
         output_file.write(char_line.replace('\n', "").replace(delimiter, ""))
         output_file.write((example_line.replace('\n', "") + "\n").replace(delimiter, ""))
@@ -656,8 +664,8 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
             entry_list = [entries[selection - 1]]
 
     if (ask_if_match_not_found and match_not_found) or not skip_choices:
-        print("It looks like there are multiple definitions for " + word + " available. "
-              "Which one would you like to use?")
+        print("It looks like there are multiple definitions for " + word +
+              " available. Which one would you like to use?")
 
         print("\n\n-------- Option 0 ---------\n")
         print("Type 0 to skip.")
@@ -877,7 +885,7 @@ def process_char_entry(book, char):
 
                 # Get the text for simplified components
                 content = soup.select_one(
-                    '.p_cat_heading__and__centre_alignment:contains("SIMPLIFIED COMPONENTS")')   # type: bs4.element.Tag
+                    '.p_cat_heading__and__centre_alignment:contains("SIMPLIFIED COMPONENTS")')  # type: bs4.element.Tag
 
                 if content is not None:
                     organized_entry["simplifiedcomponents"] = str(content.find_next())
