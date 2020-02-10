@@ -67,7 +67,7 @@ def create_image_name(organized_entry, image_location=""):
         return file_name + "-" + organized_entry["pinyin_text"] + '.' + file_extension
 
 
-def get_examples_html(word, word_pinyin, driver=None, is_server=True):
+def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=20):
     """
     Reach out to https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=%E4%B8%BA%E7%9D%80
     and get example sentences.
@@ -76,6 +76,7 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True):
     :param str word_pinyin: The pinyin of the word - to make sure if there are multiple variants you get a matching variant
     :param selenium.webdriver.chrome.webdriver.WebDriver driver: The webdriver we want to use to generate the example
     :param bool is_server: Determines if the function is being called from a server or not.
+    :param int max_page: The maximum number of pages in which to search for examples
     :return Returns a template string with all of the examples formatted within it.
     :rtype str
     """
@@ -107,43 +108,75 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True):
             else:
                 return "No examples found for that word or finding an example took longer than 5 seconds."
 
-    html = driver.page_source
-
-    soup = BeautifulSoup(html, 'html.parser')  # type: bs4.BeautifulSoup
-
-    results = soup.find_all("div", {"class": "example_lst"})  # type: bs4.element.ResultSet
-
-    if len(results) > 1:
-        return "The HTML contained more than one div with class \"example_lst\" which shouldn't happen. Has their " \
-               "HTML changed? This error prevents us from continuing to generate an example."
-
     examples = []
+    examples_found = False
 
     i = 0
-    for example in results[0].find_all("li"):
+    while not examples_found:
 
-        # We don't need more than five examples.
-        if i > 4:
-            break
+        html = driver.page_source
 
-        data = example.find("div", {"class": "exam"})
+        soup = BeautifulSoup(html, 'html.parser')  # type: bs4.BeautifulSoup
 
-        chinese_sentence = data.find("p", {"class": "stc"}).text.split(" ")
-        del chinese_sentence[-2:]
-        chinese_sentence = "".join(chinese_sentence).replace(word, "<em class=\"highlight\">" + word + "</em>")
+        results = soup.find_all("div", {"class": "example_lst"})  # type: bs4.element.ResultSet
 
-        # I know the way I did this is gross. Sue me.
-        pinyin = str(data.find("p", {"class": "pinyin"})).replace("<p class=\"pinyin\">", "").replace("</p>", "")\
-            .replace("hl", "highlight")
-        translation = data.find("p", {"class": "trans"}).text
+        if len(results) > 1:
+            return "The HTML contained more than one div with class \"example_lst\" which shouldn't happen. Has their " \
+                   "HTML changed? This error prevents us from continuing to generate an example."
 
-        if word_pinyin in pinyin:
-            examples.append((chinese_sentence, pinyin, translation))
-            i = i + 1
-            logging.debug("Character pinyin did not match example. Skipping this example.")
+        for example in results[0].find_all("li"):
 
-    env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
-    template = env.get_template("examples.html")
+            # We don't need more than five examples.
+            if i > 4:
+                examples_found = True
+                break
+
+            data = example.find("div", {"class": "exam"})
+
+            chinese_sentence = data.find("p", {"class": "stc"}).text.split(" ")
+            del chinese_sentence[-2:]
+            chinese_sentence = "".join(chinese_sentence).replace(word, "<em class=\"highlight\">" + word + "</em>")
+
+            # I know the way I did this is gross. Sue me.
+            pinyin = str(data.find("p", {"class": "pinyin"})).replace("<p class=\"pinyin\">", "").replace("</p>", "")\
+                .replace("hl", "highlight")
+            translation = data.find("p", {"class": "trans"}).text
+
+            if word_pinyin in pinyin:
+                examples.append((chinese_sentence, pinyin, translation))
+                i = i + 1
+                logging.debug("Character pinyin did not match example. Skipping this example.")
+
+        env = jinja2.Environment(loader=jinja2.PackageLoader('app', 'templates'))
+        template = env.get_template("examples.html")
+
+        if not examples_found:
+            logging.info("Not all examples found. Moving to next page.")
+            try:
+                # Example if I ever decide to change this to a click:
+                # driver.find_element_by_css_selector('a.btn.next').click()  # Click to get the next page
+
+                # Urls are normally formatted like:
+                # https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=%E7%9D%80&page=1
+                # If we want to get the next page we can just manually change the page via the below.
+                split_url = driver.current_url.split("page=")
+                if len(split_url) == 1:
+                    driver.get(split_url[0] + "&page=2")
+                else:
+                    # split_url[1] contains the page number in the URL
+                    page = int(split_url[1]) + 1
+                    if page < max_page:
+                        driver.get(split_url[0] + "page=" + str(page))
+                    else:
+                        logging.info("Checked " + str(page) + " pages looking for " + word + " (" + word_pinyin +
+                                     ") and did not reach requested number of examples")
+                        break
+                driver.find_element_by_class_name("autolink")  # Wait for the results to appear
+            except NoSuchElementException:
+                if i > 0:
+                    logging.info("No more example pages to check. Moving on.")
+                else:
+                    "No examples found for that word or finding an example took longer than 5 seconds."
 
     return template.render(examples=examples)
 
@@ -549,7 +582,7 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
 
     entries = []  # type: list
 
-    entry_list = [] # Used to return the entries we found.
+    entry_list = []  # Used to return the entries we found.
 
     for entry in results:
         entries.append(process_word_entry(entry, ebook))
@@ -579,7 +612,6 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
                     if "surname" in str(definition).lower() or "variant of" in str(definition).lower() \
                             or str(definition).lower().startswith("see "):
                         useless_definition = True
-                        entries.remove(entry)
 
                 if not useless_definition:
 
@@ -631,7 +663,9 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
         print("Type 0 to skip.")
 
         for index, entry in enumerate(entries):
-            if entry["traditional"] == simplified_word or entry["simplified"].strip() == simplified_word:
+            if entry["traditional"] == simplified_word or entry["simplified"].strip() == simplified_word and not \
+                    ("surname" in str(definition).lower() or "variant of" in str(definition).lower()
+                     or str(definition).lower().startswith("see ")):
                 print("\n-------- Option " + str(index + 1) + "---------\n")
                 print(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
 
