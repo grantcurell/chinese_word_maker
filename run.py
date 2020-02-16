@@ -1,7 +1,7 @@
 __author__ = "Grant Curell"
 __copyright__ = "Do what you want with it"
 __license__ = "GPLv3"
-__version__ = "1.5.2"
+__version__ = "1.6.0"
 __maintainer__ = "Grant Curell"
 
 from ebooklib import epub
@@ -84,9 +84,9 @@ def main():
 
     if args.print_usage:
         print('Run a server:')
-        print("--run-server --use-media-folder --anki-username \"User 1\"")
+        print('--run-server --use-media-folder --anki-username "User 1"')
         print('\nCreate combined cards:')
-        print('python run.py --use-media-folder --anki-username "User 1" --file test_words_2.txt --skip-choices --delimiter \ ')
+        print('python run.py --use-media-folder --anki-username "User 1" --file output.txt --skip-choices --show-chrome --delimiter \  --combine-exact --preference-hsk')
         print('\nVisual Studio Code regex for excluding lines starting with asterisk: ^(?!\*).*\\n')
         print('\nMapping for "Chinse Words Updated" is:')
         print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
