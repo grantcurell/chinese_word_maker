@@ -10,6 +10,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from app import app
 import platform
+import pickle
 
 
 def main():
@@ -40,6 +41,10 @@ def main():
     parser.add_argument('--preference-hsk', dest="preference_hsk", required=False, action='store_true',
                         default=False, help='Uses whether a word is from HSK vocab as a tiebreaker between multiple'
                                             ' matching words. Discards non-HSK words.')
+    parser.add_argument('--resume', dest="resume", required=False, action='store_true', default=False,
+                        help='After word creation a file called ~temp will be created. Using the same syntax you did'
+                             ' to originally run the program, you can add --resume if for some reason the program'
+                             ' failed during example creation.')
     parser.add_argument('--allow-online-choices', dest="allow_online_choices", required=False, action='store_true',
                         default=False, help='Enables command line choices with the server running.')
     parser.add_argument('--ebook-path', metavar='EBOOK_PATH', dest="ebook_path", required=False, type=str,
@@ -162,22 +167,35 @@ def main():
         output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
                         thread_count=args.thread_count)
     else:
-        if args.input_file_name:
+        if args.input_file_name and not args.resume:
             if Path(args.input_file_name).is_file():
                 words = []
                 with open(args.input_file_name, encoding="utf-8-sig") as input_file:
                     for word in input_file.readlines():
-                        words.append(word)
+                        if word.strip() != "":
+                            words.append(word)
 
                 words = get_words(words, ebook=app.config["ebook"], skip_choices=args.skip_choices,
                                   ask_if_match_not_found=args.ask_if_match_not_found,
                                   combine_exact_defs=args.combine_exact, preference_hsk=args.preference_hsk)
 
+                # Before creating examples, create a temp file with words data. This allows us to retrieve that data
+                # in the event of a problem with the examples.
+                with open('~temp', 'wb') as words_temp_file:
+                    pickle.dump(words, words_temp_file)
+
                 output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
-                                args.thread_count)
+                                args.thread_count, args.show_chrome)
             else:
                 print(args.input_file_name + " is not a file or doesn't exist!")
                 exit(0)
+        elif args.resume:
+
+            with open('~temp', 'rb') as words_temp_file:
+                words = pickle.load(words_temp_file)
+
+            output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
+                            args.thread_count, args.show_chrome)
         else:
             print("No input file name specified! You must provide a word list or run a server!")
             exit(0)

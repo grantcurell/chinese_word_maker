@@ -68,7 +68,7 @@ def create_image_name(organized_entry, image_location=""):
         return file_name + "-" + organized_entry["pinyin_text"] + '.' + file_extension
 
 
-def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=20):
+def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=20, show_chrome=False):
     """
     Reach out to https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=%E4%B8%BA%E7%9D%80
     and get example sentences.
@@ -79,6 +79,7 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=2
     :param selenium.webdriver.chrome.webdriver.WebDriver driver: The webdriver we want to use to generate the example
     :param bool is_server: Determines if the function is being called from a server or not.
     :param int max_page: The maximum number of pages in which to search for examples
+    :param bool show_chrome: Used to determine whether to show the browser or not
     :return Returns a template string with all of the examples formatted within it.
     :rtype str
     """
@@ -365,7 +366,7 @@ def _get_word_line(word, delimiter):
            "<br>".join(word["defs"]).replace(delimiter, "") + delimiter + word["hsk"].replace(" ", "")
 
 
-def output_combined(output_file_name, char_images_folder, word_list, delimiter, thread_count):
+def output_combined(output_file_name, char_images_folder, word_list, delimiter, thread_count, show_chrome):
     """
     Allows you to output flashcards with both the word and the character embedded in them.
 
@@ -374,6 +375,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
     :param list word_list: The list of words we want to write to file
     :param str delimiter: The delimiter you want to use for your flashcards
     :param int thread_count: The number of threads that will be used to pull examples
+    :param bool show_chrome: Used to control whether the chrome browsers will appear or not
     :return: Returns nothing
     """
 
@@ -387,7 +389,8 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
         # forever.
         with ThreadPoolExecutor(max_workers=thread_count) as executor:
 
-            future_example = {executor.submit(get_examples_html, word["simplified"], word["pinyin"], is_server=False):
+            future_example = {executor.submit(get_examples_html, word["simplified"], word["pinyin"], is_server=False,
+                                              show_chrome=show_chrome):
                               word for word in word_list}
 
             length = str(len(word_list))
@@ -623,6 +626,9 @@ def process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_
                     organized_entry["characters"].append(unknown_character_result)
                 elif individual_characters:
                     organized_entry["characters"].append(individual_characters[0])
+
+    if organized_entry["simplified"].strip() == "":
+        organized_entry["simplified"] = HanziConv.toSimplified(organized_entry["traditional"])
 
     return organized_entry
 
