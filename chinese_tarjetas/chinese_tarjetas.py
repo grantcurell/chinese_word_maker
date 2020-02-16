@@ -156,7 +156,7 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=2
         template = env.get_template("examples.html")
 
         if not examples_found:
-            logging.info("Not all examples found. Moving to next page.")
+            logging.debug("Not all examples found. Moving to next page.")
             try:
                 # Example if I ever decide to change this to a click:
                 # driver.find_element_by_css_selector('a.btn.next').click()  # Click to get the next page
@@ -676,6 +676,15 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
 
     if entries is None:
         entries = []
+
+    logging_level = None
+
+    # Suppress output unless we are in debug mode because this is super confusing with the recursive calls.
+    if called_from_process_word_entry:
+        if logging.DEBUG != logging.root.level:
+            logging_level = logging.root.level
+            logging.basicConfig(level=logging.WARNING)
+
     logging.info("Requested word is: " + word)
 
     results = get_mdbg(word)
@@ -689,6 +698,8 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
                                               combine_exact_defs, ebook, preference_hsk))
 
     match_not_found = False
+    definition = ""
+    simplified_word = ""
 
     if skip_choices:
         # We use the simplified to avoid the one to many problem.
@@ -737,6 +748,12 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
         # Only used when no good definitions were found.
         if len(entry_list) == 0:
             entry_list = useless_defs
+            exact_match = True
+
+            if len(useless_defs) > 1:
+                found_second = True
+            else:
+                selection = 1
 
         # This logic controls behavior associated with the preference_hsk list. When this is active it will prune
         # all results that don't have an HSK association. If none of the results have an HSK association it will do
@@ -767,6 +784,11 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
         if not exact_match:
 
             if skip_if_not_exact:
+
+                # Return the logging level to normal
+                if called_from_process_word_entry:
+                    logging.basicConfig(level=logging_level)
+
                 return []
             else:
                 selection = 1
@@ -819,6 +841,10 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
             if len(entries) >= selection > 0:
                 if entries[selection - 1] not in entry_list:
                     entry_list.append(entries[selection - 1])
+
+    # Return the logging level to normal
+    if called_from_process_word_entry:
+        logging.basicConfig(level=logging_level)
 
     if selection != 0:
         if len(entry_list) > 1:
