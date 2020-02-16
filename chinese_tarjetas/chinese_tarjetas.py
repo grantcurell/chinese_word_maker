@@ -493,27 +493,29 @@ def get_words(words, ebook=None, skip_choices=False, ask_if_match_not_found=True
     return new_words
 
 
-def process_word_entry(entry, ebook=None):
+def _get_word_info(organized_entry, entry):
     """
-    Processes a single row from www.mbdg.net and returns it in a dictionary
+    This is just a helper function so that I can reuse this code within this method. Notice it does not return
+    anything. It is expected that a dictonary
 
-    :param bs4.element.Tag entry: This is equivalent to one row in the results from www.mdbg.net
-    :param ebook ebook: An eBook file object
-    :return: Returns a list of dictionary items containing each of the possible results
-    :rtype: list of dicts
+    :param dictonary organized_entry: This is a dictionary we are passing by reference which will hold our
+                                            character data
+    :param entry: This is the same as entry from process_word_entry. This is one line of data from MDBG
+    :return: Returns an organized entry with defs, simplified, and traditional
     """
 
-    organized_entry = {}  # type: dict
-
-    organized_entry.update({"traditional": entry.find("td", {"class": "head"}).find("div", {"class": "hanzi"}).text})
+    organized_entry.\
+        update({"traditional": entry.find("td", {"class": "head"}).find("div", {"class": "hanzi"}).text})
 
     # I didn't investigate why, but for some reason the site was adding u200b so I just manually stripped that
     # whitespace out.
-    organized_entry.update({"pinyin": str(entry.find("div", {"class": "pinyin"}).text).strip().replace(u'\u200b', "")})
+    organized_entry. \
+        update({"pinyin": str(entry.find("div", {"class": "pinyin"}).text).strip().replace(u'\u200b', "")})
 
     # The entries come separated by /'s which is why we have the split here
     # The map function here just gets rid of the extra whitespace on each word before assignment
-    organized_entry.update({"defs": list(map(str.strip, str(entry.find("div", {"class": "defs"}).text).split('/')))})
+    organized_entry. \
+        update({"defs": list(map(str.strip, str(entry.find("div", {"class": "defs"}).text).split('/')))})
 
     tail = entry.find("td", {"class": "tail"})
     simplified = tail.find("div", {"class": "hanzi"})  # type: bs4.element.Tag
@@ -528,6 +530,27 @@ def process_word_entry(entry, ebook=None):
         organized_entry.update({"hsk": hsk.text})
     else:
         organized_entry.update({"hsk": ""})
+
+    return organized_entry
+
+
+def process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_exact, combine_exact_defs, ebook=None):
+    """
+    Processes a single row from www.mbdg.net and returns it in a dictionary
+
+    :param bs4.element.Tag entry: This is equivalent to one row in the results from www.mdbg.net
+    :param skip_choices: Instead of skipping the choices it will just automatically select the closest match
+    :param bool ask_if_match_not_found: See docstrings for process word
+    :param bool skip_if_not_exact: See docstrings for process word
+    :param bool combine_exact_defs: See docstrings for process word
+    :param ebook ebook: An eBook file object
+    :return: Returns a list of dictionary items containing each of the possible results
+    :rtype: list of dicts
+    """
+
+    organized_entry = {}  # type: dict
+
+    _get_word_info(organized_entry, entry)
 
     if ebook:
         organized_entry["characters"] = []  # type: list
@@ -553,14 +576,56 @@ def process_word_entry(entry, ebook=None):
                         organized_entry["characters"].append(individual_character)
                         exact_match_found = True
 
-            if not exact_match_found and individual_characters:
-                organized_entry["characters"].append(individual_characters[0])
+            if not exact_match_found:
+
+                # Reach out to MDBG, get data on the unknown character
+                unknown_character_entry_lookup = get_mdbg(character)
+
+                # Make sure there was a return and if there was perform the lookup
+                if unknown_character_entry_lookup:
+
+                    entry_list = []
+
+                    for entry in unknown_character_entry_lookup:
+                        entry_list.append(_get_word_info({}, entry))
+
+                    unknown_character_result = process_word(character,
+                                                            skip_choices=skip_choices,
+                                                            ask_if_match_not_found=ask_if_match_not_found,
+                                                            skip_if_not_exact=skip_if_not_exact,
+                                                            combine_exact_defs=combine_exact_defs,
+                                                            called_from_process_word_entry=True,
+                                                            entries=entry_list)
+
+                    organized_entry["characters"].append("stuff")
+                elif individual_characters:
+                    organized_entry["characters"].append(individual_characters[0])
 
     return organized_entry
 
 
+def get_mdbg(word):
+    """
+    Used for looking up a word in the MDBG database
+
+    :param str word: The word to lookup
+    :return: Return a type of bs4.element.ResultSet with the results of your lookup.
+    """
+
+    logging.debug("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word)
+
+    url_string = "https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" \
+                 + quote(word)  # type: str
+
+    html = urlopen(url_string).read().decode('utf-8')  # type: str
+
+    soup = BeautifulSoup(html, 'html.parser')  # type: bs4.BeautifulSoup
+
+    return soup.find_all("tr", {"class": "row"})  # type: bs4.element.ResultSet
+
+
 def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=True, skip_if_not_exact=True,
-                 combine_exact_defs=False):
+                 combine_exact_defs=False, called_from_process_word_entry=False, entries=None):
     """
     Processes a word in the list of words
 
@@ -572,28 +637,32 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
                                          it will ask.
     :param bool skip_if_not_exact: Skip if an exact match isn't found.
     :param bool combine_exact_defs: Used if you want to just return a definition for everything with an exact match.
+    :param bool called_from_process_word_entry: Used when there is a recursive call from process_word_entry. This
+                                                happens when there was a character that had no match in the ebook. In
+                                                this case we want to get data from the web, but we need to use the
+                                                selection logic of this function to get that data. When this is true,
+                                                entries will come from process_word_entry instead of being a blank list.
+                                                process_word_entry fills out the fields simplified, tradtional, and
+                                                defs. We need that data here because we are going to skip the call from
+                                                process_word_entry. This variable is how we pass it.
+    :param list entries: A list of character entries for each character in the word.
     :return: Returns a dictionary containing the word's entry
     :rtype: dict
     """
 
+    if entries is None:
+        entries = []
     logging.info("Requested word is: " + word)
-    logging.debug("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word)
 
-    url_string = "https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" \
-                 + quote(word)  # type: str
-
-    html = urlopen(url_string).read().decode('utf-8')  # type: str
-
-    soup = BeautifulSoup(html, 'html.parser')  # type: bs4.BeautifulSoup
-
-    results = soup.find_all("tr", {"class": "row"})  # type: bs4.element.ResultSet
-
-    entries = []  # type: list
+    results = get_mdbg(word)
 
     entry_list = []  # Used to return the entries we found.
 
-    for entry in results:
-        entries.append(process_word_entry(entry, ebook))
+    if not called_from_process_word_entry:
+        entries = []
+        for entry in results:
+            entries.append(process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_exact,
+                                              combine_exact_defs, ebook))
 
     match_not_found = False
 
@@ -683,8 +752,6 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
         print("You may enter multiple selections. Enter them one after another. Type -1 to end.")
         while selection != -1 and selection != 0:
             selection = int(input("Enter your selection: "))
-
-            length = len(entries)
 
             if len(entries) >= selection > 0:
                 if entries[selection - 1] not in entry_list:
