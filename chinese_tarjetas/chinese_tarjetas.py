@@ -781,6 +781,7 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
                         temp_list.append(entry)
 
                 entry_list = temp_list
+                entries = temp_list
 
                 if len(entry_list) == 1:
                     exact_match = True
