@@ -388,7 +388,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
         with ThreadPoolExecutor(max_workers=thread_count) as executor:
 
             future_example = {executor.submit(get_examples_html, word["simplified"], word["pinyin"], is_server=False):
-                                  word for word in word_list}
+                              word for word in word_list}
 
             length = str(len(word_list))
             i = 1
@@ -435,7 +435,8 @@ def output_combined_online(word, output_file_name, delimiter, char_line, example
         output_file.write((example_line.replace('\n', "") + "\n").replace(delimiter, ""))
 
 
-def get_words(words, ebook=None, skip_choices=False, ask_if_match_not_found=True, combine_exact_defs=False):
+def get_words(words, ebook=None, skip_choices=False, ask_if_match_not_found=True, combine_exact_defs=False,
+              preference_hsk=False):
     """
     Reaches out to www.mdbg.net and grabs the data for each of the words on which you want data or searches an
     instance of Chinese Blockbust eBook for characters.
@@ -447,6 +448,7 @@ def get_words(words, ebook=None, skip_choices=False, ask_if_match_not_found=True
     :param bool ask_if_match_not_found: The program will first try to skip all choices, but if it can't find a match
                                          it will ask.
     :param bool combine_exact_defs: Used if you want to just return a definition for everything with an exact match.
+    :param bool preference_hsk: Used as a tiebreaker if there are multiple matches. Selects the one which is an HSK word
     :return: Returns two lists, one with the words found and the other with the characters found
     :rtype: list
     """
@@ -468,7 +470,8 @@ def get_words(words, ebook=None, skip_choices=False, ask_if_match_not_found=True
 
                 for word_entry in process_word(word, skip_choices=skip_choices, ebook=ebook,
                                                ask_if_match_not_found=ask_if_match_not_found,
-                                               combine_exact_defs=combine_exact_defs):
+                                               combine_exact_defs=combine_exact_defs,
+                                               preference_hsk=preference_hsk):
                     if word_entry:
                         new_words.append(word_entry)
 
@@ -507,7 +510,7 @@ def _get_word_info(organized_entry, entry):
     :return: Returns an organized entry with defs, simplified, and traditional
     """
 
-    organized_entry.\
+    organized_entry. \
         update({"traditional": entry.find("td", {"class": "head"}).find("div", {"class": "hanzi"}).text})
 
     # I didn't investigate why, but for some reason the site was adding u200b so I just manually stripped that
@@ -537,7 +540,8 @@ def _get_word_info(organized_entry, entry):
     return organized_entry
 
 
-def process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_exact, combine_exact_defs, ebook=None):
+def process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_exact, combine_exact_defs, ebook=None,
+                       preference_hsk=False):
     """
     Processes a single row from www.mbdg.net and returns it in a dictionary
 
@@ -547,6 +551,7 @@ def process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_
     :param bool skip_if_not_exact: See docstrings for process word
     :param bool combine_exact_defs: See docstrings for process word
     :param ebook ebook: An eBook file object
+    :param bool preference_hsk: Used as a tiebreaker if there are multiple matches. Selects the one which is an HSK word
     :return: Returns a list of dictionary items containing each of the possible results
     :rtype: list of dicts
     """
@@ -598,7 +603,8 @@ def process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_
                                                             skip_if_not_exact=skip_if_not_exact,
                                                             combine_exact_defs=combine_exact_defs,
                                                             called_from_process_word_entry=True,
-                                                            entries=entry_list)
+                                                            entries=entry_list,
+                                                            preference_hsk=preference_hsk)
 
                     # This converts unknown_character_results from a list of one element to a regular dictionary item.
                     # This happens because process_word returns a list
@@ -642,7 +648,7 @@ def get_mdbg(word):
 
 
 def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=True, skip_if_not_exact=True,
-                 combine_exact_defs=False, called_from_process_word_entry=False, entries=None):
+                 combine_exact_defs=False, called_from_process_word_entry=False, entries=None, preference_hsk=False):
     """
     Processes a word in the list of words
 
@@ -663,6 +669,7 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
                                                 defs. We need that data here because we are going to skip the call from
                                                 process_word_entry. This variable is how we pass it.
     :param list entries: A list of character entries for each character in the word.
+    :param bool preference_hsk: Used as a tiebreaker if there are multiple matches. Selects the one which is an HSK word
     :return: Returns a dictionary containing the word's entry
     :rtype: dict
     """
@@ -679,7 +686,7 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
         entries = []
         for entry in results:
             entries.append(process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_exact,
-                                              combine_exact_defs, ebook))
+                                              combine_exact_defs, ebook, preference_hsk))
 
     match_not_found = False
 
@@ -722,6 +729,31 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
                     if not found_second:
                         selection = index + 1
 
+        # This logic controls behavior associated with the preference_hsk list. When this is active it will prune
+        # all results that don't have an HSK association. If none of the results have an HSK association it will do
+        # nothing.
+        if preference_hsk:
+
+            an_entry_has_hsk = False
+
+            # Make sure at least one entry has an HSK association
+            for entry in entry_list:
+                if entry["hsk"].strip() != "":
+                    an_entry_has_hsk = True
+
+            temp_list = []
+
+            if an_entry_has_hsk:
+                for entry in entry_list:
+                    if entry["hsk"].strip() != "":
+                        temp_list.append(entry)
+
+                entry_list = temp_list
+
+                if len(entry_list) == 1:
+                    exact_match = True
+                    found_second = False
+
         if not exact_match:
 
             if skip_if_not_exact:
@@ -761,7 +793,11 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
                     ("surname" in str(definition).lower() or "variant of" in str(definition).lower()
                      or str(definition).lower().startswith("see ")):
                 print("\n-------- Option " + str(index + 1) + "---------\n")
-                print(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
+                if "hsk" in entry:
+                    print(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]) +
+                          "\r" + str(entry["hsk"]))
+                else:
+                    print(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
 
         print("\n\n")
         selection = -2  # type: int

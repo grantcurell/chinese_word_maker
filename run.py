@@ -34,6 +34,12 @@ def main():
     parser.add_argument('--ask-if-match-not-found', dest="ask_if_match_not_found", required=False, action='store_true',
                         default=False, help='Will only ask for input if an exact match between the pinyin and a '
                                             'character isn\'t found.')
+    parser.add_argument('--combine-exact', dest="combine_exact", required=False, action='store_true',
+                        default=False, help='Will instruct the program to automatically store all definitions matched'
+                                            ' in MDBG.')
+    parser.add_argument('--preference-hsk', dest="preference_hsk", required=False, action='store_true',
+                        default=False, help='Uses whether a word is from HSK vocab as a tiebreaker between multiple'
+                                            ' matching words. Discards non-HSK words.')
     parser.add_argument('--allow-online-choices', dest="allow_online_choices", required=False, action='store_true',
                         default=False, help='Enables command line choices with the server running.')
     parser.add_argument('--ebook-path', metavar='EBOOK_PATH', dest="ebook_path", required=False, type=str,
@@ -75,7 +81,7 @@ def main():
         print('Run a server:')
         print("--run-server --use-media-folder --anki-username \"User 1\"")
         print('\nCreate combined cards:')
-        print('python run.py --use-media-folder --anki-username "User 1" --file test_words_2.txt --delimiter \ --skip-choices')
+        print('python run.py --use-media-folder --anki-username "User 1" --file test_words_2.txt --skip-choices --delimiter \ ')
         print('\nVisual Studio Code regex for excluding lines starting with asterisk: ^(?!\*).*\\n')
         print('\nMapping for "Chinse Words Updated" is:')
         print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
@@ -149,7 +155,9 @@ def main():
         driver.close()
     elif args.single_word:
 
-        words = get_words(args.single_word, app.config["ebook"], args.skip_choices, args.ask_if_match_not_found)
+        words = get_words(args.single_word, ebook=app.config["ebook"], skip_choices=args.skip_choices,
+                          ask_if_match_not_found=args.ask_if_match_not_found, combine_exact_defs=args.combine_exact,
+                          preference_hsk=args.preference_hsk)
 
         output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
                         thread_count=args.thread_count)
@@ -161,7 +169,9 @@ def main():
                     for word in input_file.readlines():
                         words.append(word)
 
-                words = get_words(words, app.config["ebook"], args.skip_choices)
+                words = get_words(words, ebook=app.config["ebook"], skip_choices=args.skip_choices,
+                                  ask_if_match_not_found=args.ask_if_match_not_found,
+                                  combine_exact_defs=args.combine_exact, preference_hsk=args.preference_hsk)
 
                 output_combined(args.words_output_file_name, args.chars_image_folder, words, args.delimiter,
                                 args.thread_count)
