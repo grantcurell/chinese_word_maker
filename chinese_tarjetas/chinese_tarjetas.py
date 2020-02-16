@@ -309,8 +309,11 @@ def get_chars_html(characters, image_location=path.join("app", "static"), server
                 organized_entry["examples"] += example
             webpage += template.render(image_path=image_path, results=organized_entry) + "<hr>"
         else:
-            webpage += template.render(image_path=create_image_name(organized_entry), results=organized_entry) + \
-                       "<hr>"
+            if "image" in organized_entry:
+                webpage += template.render(image_path=create_image_name(organized_entry), results=organized_entry) + \
+                           "<hr>"
+            else:
+                webpage += template.render(image_path=None, results=organized_entry) + "<hr>"
 
     # There are a huge number of BR tags and they aren't actually necessary.
     return webpage.replace("<br>", "")
@@ -597,7 +600,21 @@ def process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_
                                                             called_from_process_word_entry=True,
                                                             entries=entry_list)
 
-                    organized_entry["characters"].append("stuff")
+                    # This converts unknown_character_results from a list of one element to a regular dictionary item.
+                    # This happens because process_word returns a list
+                    unknown_character_result = unknown_character_result[0]
+
+                    unknown_character_result["defs"] = ', '.join(unknown_character_result["defs"])
+                    unknown_character_result["defs_text"] = unknown_character_result["defs"]
+                    unknown_character_result["pinyin_text"] = unknown_character_result["pinyin"]
+                    unknown_character_result["additionalinfo"] = unknown_character_result["hsk"]
+
+                    if unknown_character_result["pinyin"] != organized_entry["pinyin"]:
+                        unknown_character_result["additionalinfo"] += " / " + unknown_character_result["pinyin"] + \
+                                                                      " is likely an alternate pronunciation of part" \
+                                                                      " of " + organized_entry["pinyin"]
+
+                    organized_entry["characters"].append(unknown_character_result)
                 elif individual_characters:
                     organized_entry["characters"].append(individual_characters[0])
 
