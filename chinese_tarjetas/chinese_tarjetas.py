@@ -558,7 +558,7 @@ def process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_
 
     organized_entry = {}  # type: dict
 
-    _get_word_info(organized_entry, entry)
+    organized_entry = _get_word_info(organized_entry, entry)
 
     if ebook:
         organized_entry["characters"] = []  # type: list
@@ -703,6 +703,10 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
             logging.debug("\n-------- Option " + str(index + 1) + "---------\n")
             logging.debug(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
 
+        # Used in the event that we get to the end and no definitions were found. At this point we can use the useless
+        # definitions.
+        useless_defs = []
+
         for index, entry in enumerate(entries):
             if entry["traditional"] == simplified_word or entry["simplified"].strip() == simplified_word:
                 logging.debug("Found exact match. Selecting " + entry["traditional"])
@@ -713,6 +717,7 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
                     if "surname" in str(definition).lower() or "variant of" in str(definition).lower() \
                             or str(definition).lower().startswith("see "):
                         useless_definition = True
+                        useless_defs.append(entry)
 
                 if not useless_definition:
 
@@ -728,6 +733,10 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
                     # This is only added because the first definition is typically preferable.
                     if not found_second:
                         selection = index + 1
+
+        # Only used when no good definitions were found.
+        if len(entry_list) == 0:
+            entry_list = useless_defs
 
         # This logic controls behavior associated with the preference_hsk list. When this is active it will prune
         # all results that don't have an HSK association. If none of the results have an HSK association it will do
@@ -753,6 +762,7 @@ def process_word(word, skip_choices=False, ebook=None, ask_if_match_not_found=Tr
                 if len(entry_list) == 1:
                     exact_match = True
                     found_second = False
+                    selection = 1
 
         if not exact_match:
 
