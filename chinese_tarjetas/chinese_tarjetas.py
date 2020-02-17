@@ -401,7 +401,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
                 logging.info("We have processed " + str(i) + " of " + length + " examples.")
                 try:
                     if word_processed is not None:
-                        examples[word_processed["traditional"]] = future.result()
+                        examples[word_processed["final_traditional"]] = future.result()
                     else:
                         logging.info("No examples found for word: " + word_processed["final_traditional"])
                 except Exception as exc:
@@ -423,7 +423,7 @@ def output_combined(output_file_name, char_images_folder, word_list, delimiter, 
             output_file.write(line.replace(delimiter, ""))
 
             try:
-                line = examples[word["traditional"]].replace('\n', "") + "\n"
+                line = examples[word["final_traditional"]].replace('\n', "") + "\n"
             except KeyError:
                 logging.debug("No examples found for word: " + word["final_traditional"])
             i = i + 1
