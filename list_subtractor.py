@@ -22,8 +22,16 @@ with open("hsk_5.txt", encoding="utf-8-sig") as f:
 
 with open("output.txt", 'w', encoding="utf-8-sig") as f:
 
+    temp = []
+
     for word in hsk5:
         if word not in hsk4:
-            f.write(word.strip() + "\r")
+            temp.append(word)
         else:
             print("DUPLICATE: " + word.strip())
+
+    # Remove any duplicates (you can't have duplicate keys in a dictionary)
+    temp = list(dict.fromkeys(temp))
+
+    for word in temp:
+        f.write(word.strip() + "\r")
