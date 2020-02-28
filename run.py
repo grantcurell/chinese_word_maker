@@ -86,7 +86,7 @@ def main():
         print('Run a server:')
         print('--run-server --use-media-folder --anki-username "User 1"')
         print('\nCreate combined cards:')
-        print('python run.py --use-media-folder --anki-username "User 1" --file output.txt --skip-choices --show-chrome --delimiter \  --combine-exact --preference-hsk')
+        print('python run.py --use-media-folder --anki-username "User 1" --file input.txt --skip-choices --show-chrome --delimiter \  --combine-exact --preference-hsk')
         print('\nVisual Studio Code regex for excluding lines starting with asterisk: ^(?!\*).*\\n')
         print('\nMapping for "Chinse Words Updated" is:')
         print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
