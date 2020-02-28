@@ -112,6 +112,8 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=2
                 i = i + 1
                 driver.get(url_string)
             else:
+                if not is_server:
+                    driver.quit()
                 return "No examples found for that word or finding an example took longer than 5 seconds."
 
     examples = []
@@ -127,6 +129,8 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=2
         results = soup.find_all("div", {"class": "example_lst"})  # type: bs4.element.ResultSet
 
         if len(results) > 1:
+            if not is_server:
+                driver.quit()
             return "The HTML contained more than one div with class \"example_lst\" which shouldn't happen. Has their " \
                    "HTML changed? This error prevents us from continuing to generate an example."
 
@@ -183,6 +187,9 @@ def get_examples_html(word, word_pinyin, driver=None, is_server=True, max_page=2
                     logging.info("No more example pages to check. Moving on.")
                 else:
                     "No examples found for that word or finding an example took longer than 5 seconds."
+
+    if not is_server:
+        driver.quit()
 
     if template is None:
         return None
@@ -505,10 +512,10 @@ def get_words(words, ebook=None, skip_choices=False, ask_if_match_not_found=True
 def _get_word_info(organized_entry, entry):
     """
     This is just a helper function so that I can reuse this code within this method. Notice it does not return
-    anything. It is expected that a dictonary
+    anything.
 
-    :param dictonary organized_entry: This is a dictionary we are passing by reference which will hold our
-                                            character data
+    :param dictonary organized_entry: This is a dictionary we are passing by reference which will hold our character
+                                      data
     :param entry: This is the same as entry from process_word_entry. This is one line of data from MDBG
     :return: Returns an organized entry with defs, simplified, and traditional
     """
@@ -519,7 +526,7 @@ def _get_word_info(organized_entry, entry):
     # I didn't investigate why, but for some reason the site was adding u200b so I just manually stripped that
     # whitespace out.
     organized_entry. \
-        update({"pinyin": str(entry.find("div", {"class": "pinyin"}).text).strip().replace(u'\u200b', "")})
+        update({"pinyin": str(entry.find("div", {"class": "pinyin"}).text).lower().strip().replace(u'\u200b', "")})
 
     # The entries come separated by /'s which is why we have the split here
     # The map function here just gets rid of the extra whitespace on each word before assignment
@@ -615,7 +622,7 @@ def process_word_entry(entry, skip_choices, ask_if_match_not_found, skip_if_not_
 
                     unknown_character_result["defs"] = ', '.join(unknown_character_result["defs"])
                     unknown_character_result["defs_text"] = unknown_character_result["defs"]
-                    unknown_character_result["pinyin_text"] = unknown_character_result["pinyin"]
+                    unknown_character_result["pinyin_text"] = str(unknown_character_result["pinyin"]).lower()
                     unknown_character_result["additionalinfo"] = unknown_character_result["hsk"]
 
                     if unknown_character_result["pinyin"] != organized_entry["pinyin"]:
