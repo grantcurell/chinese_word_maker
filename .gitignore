@@ -45,3 +45,7 @@ backups/word_searches.bak
 ~temp
 
 *.exe~
+
+debug.log
+
+*.png

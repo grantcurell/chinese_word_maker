@@ -8,12 +8,13 @@ from argparse import ArgumentParser
 from pathlib import Path
 from concurrent.futures.thread import ThreadPoolExecutor
 from urllib.request import urlopen
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
 from bs4 import BeautifulSoup
 from hanziconv import HanziConv
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from jinja2 import Template
+from os import path
 import bs4
 import concurrent.futures
 import traceback
@@ -21,6 +22,8 @@ import sys
 import platform
 import pickle
 import logging
+import re
+import requests
 
 
 def create_driver(headless=True, binary_location=None, implicit_wait_time=5):
@@ -36,6 +39,7 @@ def create_driver(headless=True, binary_location=None, implicit_wait_time=5):
     options = webdriver.ChromeOptions()
     options.add_argument('--ignore-certificate-errors')
     options.add_argument("--test-type")
+    options.add_argument("--disable-web-security")
 
     if headless:
         options.add_argument("--headless")
@@ -56,8 +60,8 @@ def get_examples_html(word, word_pinyin, example_driver=None, is_server=True, ma
     Reach out to https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=%E4%B8%BA%E7%9D%80
     and get example sentences.
 
-    :param str word: The word, in traditional character format, for which you want to retrieve examples
-    :param str word_pinyin: The pinyin of the word - to make sure if there are multiple variants you get a matching
+    :param str word: The word_to_process, in traditional character format, for which you want to retrieve examples
+    :param str word_pinyin: The pinyin of the word_to_process - to make sure if there are multiple variants you get a matching
                             variant
     :param selenium.webdriver.chrome.webdriver.WebDriver driver: The webdriver we want to use to generate the example
     :param bool is_server: Determines if the function is being called from a server or not.
@@ -71,7 +75,7 @@ def get_examples_html(word, word_pinyin, example_driver=None, is_server=True, ma
 
     logging.info("Creating an example for " + word)
 
-    logging.info("Requested word is: " + word)
+    logging.info("Requested word_to_process is: " + word)
     logging.debug("URL is: https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=" + word)
 
     url_string = "https://dict.naver.com/linedict/zhendict/dict.html#/cnen/example?query=" \
@@ -97,7 +101,7 @@ def get_examples_html(word, word_pinyin, example_driver=None, is_server=True, ma
             else:
                 if not is_server:
                     example_driver.quit()
-                return "No examples found for that word or finding an example took longer than 5 seconds."
+                return "No examples found for that word_to_process or finding an example took longer than 5 seconds."
 
     examples = []
     examples_found = False
@@ -168,7 +172,7 @@ def get_examples_html(word, word_pinyin, example_driver=None, is_server=True, ma
                 if i > 0:
                     logging.info("No more example pages to check. Moving on.")
                 else:
-                    "No examples found for that word or finding an example took longer than 5 seconds."
+                    "No examples found for that word_to_process or finding an example took longer than 5 seconds."
 
     if not is_server:
         example_driver.quit()
@@ -215,7 +219,7 @@ def _get_word_line(word, delimiter):
     """
     Gets the string used for outputting words to Anki format
 
-    :param dict word: The word you want to output
+    :param dict word: The word_to_process you want to output
     :param str delimiter: The delimiter you want to use in the output
     :return: String used for outputting to an Anki flashcard for words
     :rtype: str
@@ -227,7 +231,7 @@ def _get_word_line(word, delimiter):
 
 def output_combined(output_file_name, word_list, delimiter, thread_count, show_chrome=False):
     """
-    Allows you to output flashcards with both the word and the character embedded in them.
+    Allows you to output flashcards with both the word_to_process and the character embedded in them.
 
     :param str output_file_name: The name of the file to which we want to write the new flashcards
     :param list word_list: The list of words we want to write to file
@@ -260,11 +264,11 @@ def output_combined(output_file_name, word_list, delimiter, thread_count, show_c
                     if word_processed is not None:
                         examples[word_processed["final_traditional"]] = future.result()
                     else:
-                        logging.info("No examples found for word: " + word_processed["final_traditional"])
+                        logging.info("No examples found for word_to_process: " + word_processed["final_traditional"])
                 except Exception as exc:
                     logging.error('%r generated an exception: %s' % (word_processed["final_traditional"], exc))
                 else:
-                    logging.info('Finished processing word %s' % word_processed["final_traditional"])
+                    logging.info('Finished processing word_to_process %s' % word_processed["final_traditional"])
 
                 i = i + 1
 
@@ -283,7 +287,7 @@ def output_combined(output_file_name, word_list, delimiter, thread_count, show_c
             try:
                 line = examples[word["final_traditional"]].replace('\n', "") + "\n"
             except KeyError:
-                logging.debug("No examples found for word: " + word["final_traditional"])
+                logging.debug("No examples found for word_to_process: " + word["final_traditional"])
             i = i + 1
 
             output_file.write(line.replace(delimiter, ""))
@@ -299,7 +303,7 @@ def get_words(words, skip_choices=False, ask_if_match_not_found=True, combine_ex
     :param bool ask_if_match_not_found: The program will first try to skip all choices, but if it can't find a match
                                          it will ask.
     :param bool combine_exact_defs: Used if you want to just return a definition for everything with an exact match.
-    :param bool preference_hsk: Used as a tiebreaker if there are multiple matches. Selects the one which is an HSK word
+    :param bool preference_hsk: Used as a tiebreaker if there are multiple matches. Selects the one which is an HSK word_to_process
     :return: Returns two lists, one with the words found and the other with the characters found
     :rtype: list
     """
@@ -311,7 +315,7 @@ def get_words(words, skip_choices=False, ask_if_match_not_found=True, combine_ex
 
     for word in words:
 
-        logging.info("Processing word " + str(i) + " of " + length)
+        logging.info("Processing word_to_process " + str(i) + " of " + length)
         i = i + 1
 
         try:
@@ -325,7 +329,7 @@ def get_words(words, skip_choices=False, ask_if_match_not_found=True, combine_ex
                     new_words.append(word_entry)
 
         except KeyboardInterrupt:
-            if not query_yes_no("You have pressed ctrl+C. Are you sure you want to exit?"):
+            if query_yes_no("You have pressed ctrl+C. Are you sure you want to exit?"):
                 exit(0)
         except AttributeError as e:
             logging.error("It looks like we've caught an attribute error. Maybe there's an invalid character "
@@ -333,17 +337,14 @@ def get_words(words, skip_choices=False, ask_if_match_not_found=True, combine_ex
             return None
         # Because you could spend a lot of time working on this we want to avoid program termination at all costs
         # Because of this we catch all exceptions and provide the option to continue or not.
-        # TODO READD
-        """
         except:
             traceback.print_exc()
             logging.error("Uh oh. We've run into a problem, but we're trying to stop the program from terminating "
                           "on you!")
             if not query_yes_no(
                     "We have caught an unknown exception but prevented the program from terminating. "
-                    "Do you want to continue with the next word?"):
+                    "Do you want to continue with the next word_to_process?"):
                 exit(1)
-        """
 
     if len(new_words) < 1:
         new_words = None
@@ -351,7 +352,46 @@ def get_words(words, skip_choices=False, ask_if_match_not_found=True, combine_ex
     return new_words
 
 
-def process_word_entry(entry, driver):
+def extract_html_images(site: str, soup: BeautifulSoup, character: str = "", image_path: str = "images/") -> BeautifulSoup:
+    """
+    Grabs all the images from chinse-characters.org or other site
+
+    :param character: The character for which you are grabbing images
+    :param site: The site from which you want to extract the characters. Should only be the base URL.
+    :param soup: A BS4 object containing all the HTML
+    :param image_path: Path to where you want to write the images
+    :return: Returns an updated BeautifulSoup object with the image names mangled for Anki.
+    """
+
+    for img in soup.find_all('img'):
+        url = img['src']
+        filename = re.search(r'/([\w_-]+)/([\w_-]+[.](jpg|gif|png))$', url)
+
+        if not filename:
+            print("Regex didn't match with the url: {}".format(url))
+            continue
+
+        file_prefix = character + "_" + filename.group(1) + "_" + filename.group(2)
+
+        if path.exists(image_path + file_prefix):
+            logging.warning("WARNING: the file " + character + filename.group(1) + " already exists so we are skipping "
+                                                                                   "it!!!")
+        else:
+            with open(image_path + file_prefix, 'wb') as f:
+                if 'http' not in url:
+                    # sometimes an image source can be relative
+                    # if it is provide the base url which also happens
+                    # to be the site variable atm.
+                    url = '{}{}'.format(site, url)
+                response = requests.get(url)
+                f.write(response.content)
+
+        img['src'] = file_prefix
+
+    return soup
+
+
+def process_word_entry(entry):
     """
     Processes a single row from www.mbdg.net and returns it in a dictionary
 
@@ -371,7 +411,7 @@ def process_word_entry(entry, driver):
         update({"pinyin": str(entry.find("div", {"class": "pinyin"}).text).lower().strip().replace(u'\u200b', "")})
 
     # The entries come separated by /'s which is why we have the split here
-    # The map function here just gets rid of the extra whitespace on each word before assignment
+    # The map function here just gets rid of the extra whitespace on each word_to_process before assignment
     organized_entry. \
         update({"defs": list(map(str.strip, str(entry.find("div", {"class": "defs"}).text).split('/')))})
 
@@ -389,21 +429,71 @@ def process_word_entry(entry, driver):
             if character == organized_entry["simplified"][i]:
                 character_string = character_string + character
             else:
-                character_string = character + organized_entry["simplified"][i]
+                character_string = character_string + character + organized_entry["simplified"][i]
     else:
         organized_entry.update({"simplified": ""})
         character_string = organized_entry["traditional"]
 
+    # Get the words from chinese-characters
+    for character in organized_entry["traditional"]:
+        driver.get("http://chinese-characters.org/cgi-bin/lookup.cgi?characterInput=" + quote(character) + "&submitButton1=Go%21")
+        soup = BeautifulSoup(driver.page_source, 'html.parser')  # type: bs4.BeautifulSoup
+
+        html = ""
+
+        for i, table in enumerate(soup.find_all("table"), start=0):
+
+            # The first table is stuff we don't care about
+            if i < 4:
+                continue
+
+            for descendant in table.find_all(recursive=True):
+                if "background" in descendant.attrs:
+                    descendant.attrs.pop("background")
+
+                # Remove all the random table images they have
+                if "img" == descendant.name:
+                    if "table" in descendant["src"] or "unavail" in descendant["src"] or "lg-feed" in descendant["src"]:
+                        descendant.extract()
+
+            for a in table.findAll('a'):
+                if "href" in a.attrs:
+                    a["href"] = urljoin("http://chinese-characters.org/", a.get('href'))
+
+            if i == 4:
+                html = html + str(extract_html_images("http://chinese-characters.org/", table, character=character))
+            elif i == 5:
+                html = html + str(table.find("tbody"))
+                break
+            else:
+                break
+
+        organized_entry["characters"].append(html)
+
+    # Get words from hanzicraft
     url_string = "https://hanzicraft.com/character/" + quote(character_string)  # type: str
 
     driver.get(url_string)  # type: str
 
-    html = driver.page_source
-
-    soup = BeautifulSoup(html, 'html.parser').find(id="display")  # type: bs4.BeautifulSoup
+    soup = BeautifulSoup(driver.page_source, 'html.parser').find(id="display")  # type: bs4.BeautifulSoup
 
     for favorite_button in soup.find_all('button', id="addfav"):
         favorite_button.decompose()
+
+    for a in soup.findAll('a'):
+
+        if "href" in a.attrs:
+            # If the character reference is actually a word_to_process, send us to mdbg instead
+            if "character" in a['href'] and len(a['href'].replace('/character/', "")) > 1:
+                a['href'] = "https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + \
+                            a['href'].split('/')[2]
+            else:
+                # The links start is relative. We want them to be FQDNs so they reach out to Hanzicraft
+                a['href'] = "https://hanzicraft.com" + a['href']
+
+            # Remove target because it causes the links to fail.
+            if "target" in a.attrs:
+                a.attrs.pop("target")
 
     organized_entry["characters"].append(str(soup))
 
@@ -418,30 +508,29 @@ def process_word_entry(entry, driver):
     return organized_entry
 
 
-def process_word(word, skip_choices=False, ask_if_match_not_found=True, skip_if_not_exact=True,
-                 combine_exact_defs=False, entries=None, preference_hsk=False):
+def process_word(word_to_process, skip_choices=False, ask_if_match_not_found=True, skip_if_not_exact=True,
+                 combine_exact_defs=False, preference_hsk=False):
     """
     Processes a word in the list of words
 
-    :param str word: The word from the list
+    :param str word_to_process: The word from the list
     :param skip_choices: Instead of skipping the choices it will just automatically select the closest
                          match
     :param bool ask_if_match_not_found: The program will first try to skip all choices, but if it can't find a match
                                          it will ask.
     :param bool skip_if_not_exact: Skip if an exact match isn't found.
     :param bool combine_exact_defs: Used if you want to just return a definition for everything with an exact match.
-    :param list entries: A list of character entries for each character in the word.
     :param bool preference_hsk: Used as a tiebreaker if there are multiple matches. Selects the one which is an HSK word
     :return: Returns a dictionary containing the word's entry
     :rtype: dict
     """
 
-    logging.info("Requested word is: " + word)
+    logging.info("Requested word_to_process is: " + word_to_process)
 
-    logging.debug("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word)
+    logging.debug("URL is: https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" + word_to_process)
 
     url_string = "https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb=" \
-                 + quote(word)  # type: str
+                 + quote(word_to_process)  # type: str
 
     html = urlopen(url_string).read().decode('utf-8')  # type: str
 
@@ -451,7 +540,7 @@ def process_word(word, skip_choices=False, ask_if_match_not_found=True, skip_if_
 
     entries = []
     for entry in soup.find_all("tr", {"class": "row"}):
-        entries.append(process_word_entry(entry, driver))
+        entries.append(process_word_entry(entry))
 
     match_not_found = False
     definition = ""
@@ -459,13 +548,13 @@ def process_word(word, skip_choices=False, ask_if_match_not_found=True, skip_if_
 
     if skip_choices:
         # We use the simplified to avoid the one to many problem.
-        simplified_word = HanziConv.toSimplified(word)
+        simplified_word = HanziConv.toSimplified(word_to_process)
 
         selection = 0
         exact_match = False
         found_second = False
 
-        logging.info(str(len(entries)) + " found from mdbg.net. Finding the closest match for " + word + ".")
+        logging.info(str(len(entries)) + " found from mdbg.net. Finding the closest match for " + word_to_process + ".")
         for index, entry in enumerate(entries):
             logging.debug("\n-------- Option " + str(index + 1) + "---------\n")
             logging.debug(str(entry["traditional"]) + "\n" + str(entry["pinyin"]) + "\n" + str(entry["defs"]))
@@ -556,7 +645,7 @@ def process_word(word, skip_choices=False, ask_if_match_not_found=True, skip_if_
         if exact_match and found_second:
             selection = 1
             match_not_found = True
-            logging.info("Found multiple possible matches to " + word + ", prompting for user input.")
+            logging.info("Found multiple possible matches to " + word_to_process + ", prompting for user input.")
 
         # We found an exact match and there was on second match so no manual intervention is required.
         if exact_match and not found_second:
@@ -567,7 +656,7 @@ def process_word(word, skip_choices=False, ask_if_match_not_found=True, skip_if_
             entry_list = [entries[selection - 1]]
 
     if (ask_if_match_not_found and match_not_found) or not skip_choices:
-        print("It looks like there are multiple definitions for " + word +
+        print("It looks like there are multiple definitions for " + word_to_process +
               " available. Which one would you like to use?")
 
         print("\n\n-------- Option 0 ---------\n")
@@ -613,7 +702,7 @@ parser.add_argument('--words-output-file', metavar='WORDS-OUTPUT-FILE', dest="wo
                     required=False, default="word_list.txt",
                     help='By default this is word_list.txt. You may change it by providing this argument.')
 parser.add_argument('--skip-choices', dest="skip_choices", required=False, action='store_true', default=False,
-                    help='This option will tell the program to just select the closest match for the word.')
+                    help='This option will tell the program to just select the closest match for the word_to_process.')
 parser.add_argument('--ask-if-match-not-found', dest="ask_if_match_not_found", required=False, action='store_true',
                     default=False, help='Will only ask for input if an exact match between the pinyin and a '
                                         'character isn\'t found.')
@@ -621,10 +710,10 @@ parser.add_argument('--combine-exact', dest="combine_exact", required=False, act
                     default=False, help='Will instruct the program to automatically store all definitions matched'
                                         ' in MDBG.')
 parser.add_argument('--preference-hsk', dest="preference_hsk", required=False, action='store_true',
-                    default=False, help='Uses whether a word is from HSK vocab as a tiebreaker between multiple'
+                    default=False, help='Uses whether a word_to_process is from HSK vocab as a tiebreaker between multiple'
                                         ' matching words. Discards non-HSK words.')
 parser.add_argument('--resume', dest="resume", required=False, action='store_true', default=False,
-                    help='After word creation a file called ~temp will be created. Using the same syntax you did'
+                    help='After word_to_process creation a file called ~temp will be created. Using the same syntax you did'
                          ' to originally run the program, you can add --resume if for some reason the program'
                          ' failed during example creation.')
 parser.add_argument('--log-level', metavar='LOG_LEVEL', dest="log_level", required=False, type=str, default="info",
@@ -722,6 +811,7 @@ elif args.resume:
     output_combined(args.words_output_file_name, words, args.delimiter,
                     args.thread_count, args.show_chrome)
 else:
-    print("No input file name specified! You must provide a word list or run a server!")
+    print("No input file name specified! You must provide a word_to_process list or run a server!")
     exit(0)
 
+driver.close()
