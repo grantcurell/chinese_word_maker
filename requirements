@@ -1,11 +1,6 @@
-beautifulsoup4
-EbookLib
-Flask
-googletrans
-hanziconv
 Jinja2
-lxml
+bs4
+hanziconv
+htmlmin
 requests
-urllib3
-Werkzeug
 selenium
