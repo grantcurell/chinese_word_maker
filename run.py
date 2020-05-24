@@ -14,7 +14,7 @@ from hanziconv import HanziConv
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from jinja2 import Template
-from os import path
+from os import path, getenv
 import bs4
 import concurrent.futures
 import traceback
@@ -24,6 +24,7 @@ import pickle
 import logging
 import re
 import requests
+import htmlmin
 
 
 def create_driver(headless=True, binary_location=None, implicit_wait_time=5):
@@ -352,14 +353,13 @@ def get_words(words, skip_choices=False, ask_if_match_not_found=True, combine_ex
     return new_words
 
 
-def extract_html_images(site: str, soup: BeautifulSoup, character: str = "", image_path: str = "images/") -> BeautifulSoup:
+def extract_html_images(site: str, soup: BeautifulSoup, character: str = "") -> BeautifulSoup:
     """
     Grabs all the images from chinse-characters.org or other site
 
     :param character: The character for which you are grabbing images
     :param site: The site from which you want to extract the characters. Should only be the base URL.
     :param soup: A BS4 object containing all the HTML
-    :param image_path: Path to where you want to write the images
     :return: Returns an updated BeautifulSoup object with the image names mangled for Anki.
     """
 
@@ -373,11 +373,11 @@ def extract_html_images(site: str, soup: BeautifulSoup, character: str = "", ima
 
         file_prefix = character + "_" + filename.group(1) + "_" + filename.group(2)
 
-        if path.exists(image_path + file_prefix):
+        if path.exists(path.join(image_path, file_prefix)):
             logging.warning("WARNING: the file " + character + filename.group(1) + " already exists so we are skipping "
                                                                                    "it!!!")
         else:
-            with open(image_path + file_prefix, 'wb') as f:
+            with open(path.join(image_path, file_prefix), 'wb') as f:
                 if 'http' not in url:
                     # sometimes an image source can be relative
                     # if it is provide the base url which also happens
@@ -435,8 +435,9 @@ def process_word_entry(entry):
         character_string = organized_entry["traditional"]
 
     # Get the words from chinese-characters
-    for character in organized_entry["traditional"]:
-        driver.get("http://chinese-characters.org/cgi-bin/lookup.cgi?characterInput=" + quote(character) + "&submitButton1=Go%21")
+    for character in "".join(dict.fromkeys(organized_entry["traditional"])):
+        driver.get("http://chinese-characters.org/cgi-bin/lookup.cgi?characterInput=" + quote(
+            character) + "&submitButton1=Go%21")
         soup = BeautifulSoup(driver.page_source, 'html.parser')  # type: bs4.BeautifulSoup
 
         html = ""
@@ -460,18 +461,21 @@ def process_word_entry(entry):
                 if "href" in a.attrs:
                     a["href"] = urljoin("http://chinese-characters.org/", a.get('href'))
 
+            for subtable in soup.find_all("table"):
+                subtable.attrs["border"] = "1px solid black;"
+
             if i == 4:
                 html = html + str(extract_html_images("http://chinese-characters.org/", table, character=character))
             elif i == 5:
-                html = html + str(table.find("tbody"))
+                html = html + "<table border: \"1px solid black;\">" + str(table.find("tbody")) + "</table>"
                 break
             else:
                 break
 
-        organized_entry["characters"].append(html)
+        organized_entry["characters"].append(html + "<hr>")
 
     # Get words from hanzicraft
-    url_string = "https://hanzicraft.com/character/" + quote(character_string)  # type: str
+    url_string = "https://hanzicraft.com/character/" + quote("".join(dict.fromkeys(character_string)))  # type: str
 
     driver.get(url_string)  # type: str
 
@@ -496,6 +500,10 @@ def process_word_entry(entry):
                 a.attrs.pop("target")
 
     organized_entry["characters"].append(str(soup))
+
+    for i, character in enumerate(organized_entry["characters"], start=0):
+        organized_entry["characters"][i] = htmlmin.minify(character, remove_empty_space=True, remove_comments=True,
+                                                          remove_optional_attribute_quotes=True)
 
     if hsk is not None:
         organized_entry.update({"hsk": hsk.text})
@@ -694,6 +702,7 @@ def process_word(word_to_process, skip_choices=False, ask_if_match_not_found=Tru
     else:
         return []
 
+
 parser = ArgumentParser(description="Used to create Anki flash cards based on data from the website www.mdbg.net")
 parser.add_argument('--file', metavar='FILE', dest="input_file_name", type=str, required=False,
                     help='The path to a newline delimited list of Chinese words or characters in Hanji The default'
@@ -710,8 +719,9 @@ parser.add_argument('--combine-exact', dest="combine_exact", required=False, act
                     default=False, help='Will instruct the program to automatically store all definitions matched'
                                         ' in MDBG.')
 parser.add_argument('--preference-hsk', dest="preference_hsk", required=False, action='store_true',
-                    default=False, help='Uses whether a word_to_process is from HSK vocab as a tiebreaker between multiple'
-                                        ' matching words. Discards non-HSK words.')
+                    default=False,
+                    help='Uses whether a word_to_process is from HSK vocab as a tiebreaker between multiple'
+                         ' matching words. Discards non-HSK words.')
 parser.add_argument('--resume', dest="resume", required=False, action='store_true', default=False,
                     help='After word_to_process creation a file called ~temp will be created. Using the same syntax you did'
                          ' to originally run the program, you can add --resume if for some reason the program'
@@ -746,7 +756,8 @@ if not args.run_server and not args.input_file_name and not args.print_usage:
     exit(0)
 
 if args.print_usage:
-    print('python run.py --anki-username "User 1" --file input.txt --skip-choices --show-chrome --delimiter \  --combine-exact --preference-hsk')
+    print(
+        'python run.py --anki-username "User 1" --file input.txt --skip-choices --show-chrome --delimiter \  --combine-exact --preference-hsk')
     print('\nVisual Studio Code regex for excluding lines starting with asterisk: ^(?!\*).*\\n')
     print('\nMapping for "Chinese Words Updated" is:')
     print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
@@ -755,7 +766,9 @@ if args.print_usage:
 if args.ask_if_match_not_found:
     args.skip_choices = True
 
-if not 'Windows' in platform.system():
+if 'Windows' in platform.system():
+    image_path = path.join(getenv("APPDATA"), "Anki2", args.anki_username, "collection.media")
+else:
     logging.error("Only works on Windows with Anki installed!")
     exit(0)
 
