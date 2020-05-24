@@ -43,3 +43,5 @@ backups/word_searches.bak
 *.exe
 
 ~temp
+
+*.exe~
