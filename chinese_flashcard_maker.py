@@ -27,7 +27,7 @@ import requests
 import htmlmin
 
 
-def create_driver(headless=True, binary_location=None, implicit_wait_time=5):
+def create_driver(headless=True, binary_location=None, implicit_wait_time=5) -> webdriver:
     """
     Creates a Google Chrome-based web driver
 
