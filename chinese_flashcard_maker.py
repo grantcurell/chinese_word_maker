@@ -1,9 +1,10 @@
 __author__ = "Grant Curell"
 __copyright__ = "Do what you want with it"
 __license__ = "GPLv3"
-__version__ = "2.0"
+__version__ = "2.1"
 __maintainer__ = "Grant Curell"
 
+import json
 from argparse import ArgumentParser
 from pathlib import Path
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -216,20 +217,6 @@ def query_yes_no(question, default="yes"):
                              "(or 'y' or 'n').\n")
 
 
-def _get_word_line(word, delimiter):
-    """
-    Gets the string used for outputting words to Anki format
-
-    :param dict word: The word_to_process you want to output
-    :param str delimiter: The delimiter you want to use in the output
-    :return: String used for outputting to an Anki flashcard for words
-    :rtype: str
-    """
-
-    return word["final_traditional"] + delimiter + word["simplified"] + delimiter + word["pinyin"] + delimiter + \
-           "<br>".join(word["defs"]).replace(delimiter, "") + delimiter + word["hsk"].replace(" ", "")
-
-
 def output_combined(output_file_name, word_list, delimiter, thread_count, show_chrome=False):
     """
     Allows you to output flashcards with both the word_to_process and the character embedded in them.
@@ -280,7 +267,8 @@ def output_combined(output_file_name, word_list, delimiter, thread_count, show_c
 
             output_file.write(word["final_traditional"] + delimiter + word["simplified"] + delimiter + word["pinyin"] +
                               delimiter + "<br>".join(word["defs"]).replace(delimiter, "") +
-                              delimiter + word["hsk"].replace(" ", "") + delimiter)
+                              delimiter + word["hsk"].replace(" ", "") + delimiter +
+                              word["history"].replace(delimiter, "") + delimiter)
 
             for character in word["characters"]:
                 output_file.write(character.replace('\n', "").replace(delimiter, ""))
@@ -434,8 +422,23 @@ def process_word_entry(entry):
         organized_entry.update({"simplified": ""})
         character_string = organized_entry["traditional"]
 
+    organized_entry["history"] = ""
+
+    for i, character in enumerate("".join(dict.fromkeys(organized_entry["traditional"]))):
+        r = requests.put("http://127.0.0.1:5000/api/lookup", data=json.dumps({"character_to_lookup": character}),
+                         headers={'Content-Type': 'application/json'})
+
+        if r.status_code != 404:
+            if i == 0:
+                organized_entry["history"] = organized_entry["history"] + r.json()["explanation"]
+            else:
+                organized_entry["history"] = organized_entry["history"] + "<br><br>" + r.json()["explanation"]
+        else:
+            organized_entry["history"] = ""
+
     # Get the words from chinese-characters
     for character in "".join(dict.fromkeys(organized_entry["traditional"])):
+
         driver.get("http://chinese-characters.org/cgi-bin/lookup.cgi?characterInput=" + quote(
             character) + "&submitButton1=Go%21")
         soup = BeautifulSoup(driver.page_source, 'html.parser')  # type: bs4.BeautifulSoup
