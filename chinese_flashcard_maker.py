@@ -425,14 +425,14 @@ def process_word_entry(entry):
     organized_entry["history"] = ""
 
     for i, character in enumerate("".join(dict.fromkeys(organized_entry["traditional"]))):
-        r = requests.put("http://127.0.0.1:5000/api/lookup", data=json.dumps({"character_to_lookup": character}),
+        r = requests.put("http://127.0.0.1:5000/api/lookup", data=json.dumps({"characters_to_lookup": character}),
                          headers={'Content-Type': 'application/json'})
 
         if r.status_code != 404:
             if i == 0:
-                organized_entry["history"] = organized_entry["history"] + r.json()["explanation"]
+                organized_entry["history"] = organized_entry["history"] + r.json()[0]["explanation"]
             else:
-                organized_entry["history"] = organized_entry["history"] + "<br><br>" + r.json()["explanation"]
+                organized_entry["history"] = organized_entry["history"] + "<br><br>" + r.json()[0]["explanation"]
         else:
             organized_entry["history"] = ""
 
