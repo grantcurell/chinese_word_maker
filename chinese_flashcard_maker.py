@@ -760,7 +760,7 @@ if not args.run_server and not args.input_file_name and not args.print_usage:
 
 if args.print_usage:
     print(
-        'python run.py --anki-username "User 1" --file input.txt --skip-choices --show-chrome --delimiter \  --combine-exact --preference-hsk')
+        'python chinese_flashcard_maker.py --anki-username "User 1" --file input.txt --skip-choices --show-chrome --delimiter \  --combine-exact --preference-hsk')
     print('\nVisual Studio Code regex for excluding lines starting with asterisk: ^(?!\*).*\\n')
     print('\nMapping for "Chinese Words Updated" is:')
     print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
