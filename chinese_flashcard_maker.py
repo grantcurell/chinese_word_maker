@@ -437,6 +437,7 @@ def process_word_entry(entry):
             organized_entry["history"] = ""
 
     # Get the words from chinese-characters
+    """
     for character in "".join(dict.fromkeys(organized_entry["traditional"])):
 
         driver.get("http://chinese-characters.org/cgi-bin/lookup.cgi?characterInput=" + quote(
@@ -476,6 +477,7 @@ def process_word_entry(entry):
                 break
 
         organized_entry["characters"].append(html + "<hr>")
+    """
 
     # Get words from hanzicraft
     url_string = "https://hanzicraft.com/character/" + quote("".join(dict.fromkeys(character_string)))  # type: str
