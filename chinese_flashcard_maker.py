@@ -765,7 +765,7 @@ if args.print_usage:
         'python chinese_flashcard_maker.py --anki-username "User 1" --file input.txt --skip-choices --show-chrome --delimiter \  --combine-exact --preference-hsk')
     print('\nVisual Studio Code regex for excluding lines starting with asterisk: ^(?!\*).*\\n')
     print('\nMapping for "Chinese Words Updated" is:')
-    print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nCharacters')
+    print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nHistory\nCharacters')
     exit(0)
 
 if args.ask_if_match_not_found:
