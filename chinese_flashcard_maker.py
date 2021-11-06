@@ -26,6 +26,9 @@ import logging
 import re
 import requests
 import htmlmin
+import ssl
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 def create_driver(headless=True, binary_location=None, implicit_wait_time=5) -> webdriver:
@@ -49,7 +52,7 @@ def create_driver(headless=True, binary_location=None, implicit_wait_time=5) -> 
     if binary_location is not None:
         options.binary_location = binary_location
 
-    driver = webdriver.Chrome(chrome_options=options)
+    driver = webdriver.Chrome(options=options)
 
     # This means the driver will wait up to 10 seconds to find a designated element.
     driver.implicitly_wait(implicit_wait_time)
@@ -341,44 +344,6 @@ def get_words(words, skip_choices=False, ask_if_match_not_found=True, combine_ex
     return new_words
 
 
-def extract_html_images(site: str, soup: BeautifulSoup, character: str = "") -> BeautifulSoup:
-    """
-    Grabs all the images from chinse-characters.org or other site
-
-    :param character: The character for which you are grabbing images
-    :param site: The site from which you want to extract the characters. Should only be the base URL.
-    :param soup: A BS4 object containing all the HTML
-    :return: Returns an updated BeautifulSoup object with the image names mangled for Anki.
-    """
-
-    for img in soup.find_all('img'):
-        url = img['src']
-        filename = re.search(r'/([\w_-]+)/([\w_-]+[.](jpg|gif|png))$', url)
-
-        if not filename:
-            print("Regex didn't match with the url: {}".format(url))
-            continue
-
-        file_prefix = character + "_" + filename.group(1) + "_" + filename.group(2)
-
-        if path.exists(path.join(image_path, file_prefix)):
-            logging.warning("WARNING: the file " + character + filename.group(1) + " already exists so we are skipping "
-                                                                                   "it!!!")
-        else:
-            with open(path.join(image_path, file_prefix), 'wb') as f:
-                if 'http' not in url:
-                    # sometimes an image source can be relative
-                    # if it is provide the base url which also happens
-                    # to be the site variable atm.
-                    url = '{}{}'.format(site, url)
-                response = requests.get(url)
-                f.write(response.content)
-
-        img['src'] = file_prefix
-
-    return soup
-
-
 def process_word_entry(entry):
     """
     Processes a single row from www.mbdg.net and returns it in a dictionary
@@ -425,59 +390,19 @@ def process_word_entry(entry):
     organized_entry["history"] = ""
 
     for i, character in enumerate("".join(dict.fromkeys(organized_entry["traditional"]))):
-        r = requests.put("http://127.0.0.1:5000/api/lookup", data=json.dumps({"characters_to_lookup": character}),
+        r = requests.put("http://" + args.api_address + "/api/lookup",
+                         data=json.dumps({"characters_to_lookup": character}),
                          headers={'Content-Type': 'application/json'})
+
+        history = re.sub("([\u4e00-\u9FFF])", "<a href=\"http://charserver.lan:4200/\\1\">\\1</a>", r.json()[0]["explanation"])
 
         if r.status_code != 404:
             if i == 0:
-                organized_entry["history"] = organized_entry["history"] + r.json()[0]["explanation"]
+                organized_entry["history"] = organized_entry["history"] + history
             else:
-                organized_entry["history"] = organized_entry["history"] + "<br><br>" + r.json()[0]["explanation"]
+                organized_entry["history"] = organized_entry["history"] + "<br><br>" + history
         else:
             organized_entry["history"] = ""
-
-    # Get the words from chinese-characters
-    """
-    for character in "".join(dict.fromkeys(organized_entry["traditional"])):
-
-        driver.get("http://chinese-characters.org/cgi-bin/lookup.cgi?characterInput=" + quote(
-            character) + "&submitButton1=Go%21")
-        soup = BeautifulSoup(driver.page_source, 'html.parser')  # type: bs4.BeautifulSoup
-
-        html = ""
-
-        for i, table in enumerate(soup.find_all("table"), start=0):
-
-            # The first table is stuff we don't care about
-            if i < 4:
-                continue
-
-            for descendant in table.find_all(recursive=True):
-                if "background" in descendant.attrs:
-                    descendant.attrs.pop("background")
-
-                # Remove all the random table images they have
-                if "img" == descendant.name:
-                    if "table" in descendant["src"] or "unavail" in descendant["src"] or "lg-feed" in descendant["src"]:
-                        descendant.extract()
-
-            for a in table.findAll('a'):
-                if "href" in a.attrs:
-                    a["href"] = urljoin("http://chinese-characters.org/", a.get('href'))
-
-            for subtable in soup.find_all("table"):
-                subtable.attrs["border"] = "1px solid black;"
-
-            if i == 4:
-                html = html + str(extract_html_images("http://chinese-characters.org/", table, character=character))
-            elif i == 5:
-                html = html + "<table border: \"1px solid black;\">" + str(table.find("tbody")) + "</table>"
-                break
-            else:
-                break
-
-        organized_entry["characters"].append(html + "<hr>")
-    """
 
     # Get words from hanzicraft
     url_string = "https://hanzicraft.com/character/" + quote("".join(dict.fromkeys(character_string)))  # type: str
@@ -749,20 +674,21 @@ parser.add_argument('--thread-count', dest="thread_count", required=False, type=
                     help='Specify the number of worker threads with which you want to grab examples.')
 parser.add_argument('--show-chrome', dest="show_chrome", required=False, action='store_true',
                     help='Will disable headless mode on Chromedriver and cause the browser to pop up')
+parser.add_argument('--api-address', dest="api_address", required=False, default="127.0.0.1:5000", help="The API "
+                    "address of the character server used to look up history.")
 parser.add_argument('--print-usage', dest="print_usage", required=False, action='store_true',
                     help='Show example usage.')
 parser.add_argument('--show-usage', dest="print_usage", required=False, action='store_true',
                     help='Show example usage.')
 
-args = parser.parse_args()  # type: argparse.Namespace
+args = parser.parse_args()
 
 if not args.run_server and not args.input_file_name and not args.print_usage:
     parser.print_help()
     exit(0)
 
 if args.print_usage:
-    print(
-        'python chinese_flashcard_maker.py --anki-username "User 1" --file input.txt --skip-choices --show-chrome --delimiter \  --combine-exact --preference-hsk')
+    print('python chinese_flashcard_maker.py --anki-username "User 1" --file input.txt --skip-choices --show-chrome --delimiter \ --combine-exact --preference-hsk --api-address 192.168.1.83:5000')
     print('\nVisual Studio Code regex for excluding lines starting with asterisk: ^(?!\*).*\\n')
     print('\nMapping for "Chinese Words Updated" is:')
     print('Traditional\nSimplified\nPinyin\nMeaning\nTags\nHistory\nCharacters')
