@@ -5,6 +5,7 @@ __version__ = "2.1"
 __maintainer__ = "Grant Curell"
 
 import json
+import subprocess
 from argparse import ArgumentParser
 from pathlib import Path
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -15,7 +16,7 @@ from hanziconv import HanziConv
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from jinja2 import Template
-from os import path, getenv
+from os import path, getenv, name
 import bs4
 import concurrent.futures
 import traceback
@@ -29,9 +30,11 @@ import htmlmin
 import ssl
 
 ssl._create_default_https_context = ssl._create_unverified_context
+IMPLICIT_WAIT_TIME = 5
+MAX_HANZICRAFT_EXAMPLES = 10
 
 
-def create_driver(headless=True, binary_location=None, implicit_wait_time=5) -> webdriver:
+def create_driver(headless=True, binary_location=None, implicit_wait_time=IMPLICIT_WAIT_TIME) -> webdriver:
     """
     Creates a Google Chrome-based web driver
 
@@ -129,7 +132,7 @@ def get_examples_html(word, word_pinyin, example_driver=None, is_server=True, ma
         for example in results[0].find_all("li"):
 
             # We don't need more than five examples.
-            if i > 4:
+            if i >= MAX_HANZICRAFT_EXAMPLES:
                 examples_found = True
                 break
 
@@ -268,6 +271,7 @@ def output_combined(output_file_name, word_list, delimiter, thread_count, show_c
         logging.info("Writing words.")
         for word in word_list:
 
+            logging.info("Outputting " + word["final_traditional"])
             output_file.write(word["final_traditional"] + delimiter + word["simplified"] + delimiter + word["pinyin"] +
                               delimiter + "<br>".join(word["defs"]).replace(delimiter, "") +
                               delimiter + word["hsk"].replace(" ", "") + delimiter +
@@ -283,6 +287,14 @@ def output_combined(output_file_name, word_list, delimiter, thread_count, show_c
             i = i + 1
 
             output_file.write(line.replace(delimiter, ""))
+
+        # TODO - this is a hack. See https://github.com/grantcurell/chinese_word_maker/issues/1
+        if name == 'nt':
+            logging.info("Killing lingering chromedriver processes.")
+            subprocess.run(["taskkill", "/F", "/IM", "chromedriver.exe"])
+            logging.info("Killing lingering chrome processes.")
+            subprocess.run(["taskkill", "/F", "/IM", "chrome.exe"])
+            exit(0)
 
 
 def get_words(words, skip_choices=False, ask_if_match_not_found=True, combine_exact_defs=False, preference_hsk=False):
@@ -394,9 +406,10 @@ def process_word_entry(entry):
                          data=json.dumps({"characters_to_lookup": character}),
                          headers={'Content-Type': 'application/json'})
 
-        history = re.sub("([\u4e00-\u9FFF])", "<a href=\"http://charserver.lan:4200/\\1\">\\1</a>", r.json()[0]["explanation"])
-
         if r.status_code != 404:
+            history = re.sub("([\u4e00-\u9FFF])", "<a href=\"http://charserver.lan:4200/\\1\">\\1</a>",
+                             r.json()[0]["explanation"])
+
             if i == 0:
                 organized_entry["history"] = organized_entry["history"] + history
             else:
@@ -405,7 +418,7 @@ def process_word_entry(entry):
             organized_entry["history"] = ""
 
     # Get words from hanzicraft
-    url_string = "https://hanzicraft.com/character/" + quote("".join(dict.fromkeys(character_string)))  # type: str
+    url_string = "https://hanzicraft.com/character/" + quote("".join(dict.fromkeys(character)))  # type: str
 
     driver.get(url_string)  # type: str
 
@@ -413,6 +426,18 @@ def process_word_entry(entry):
 
     for favorite_button in soup.find_all('button', id="addfav"):
         favorite_button.decompose()
+
+    for character_nav in soup.find_all('div', {"class": "character-nav"}):
+        character_nav.decompose()
+
+    for index, word_block in enumerate(soup.find_all('div', {"class": "wordblock"})):
+        if index > 4:
+            word_block.decompose()
+
+    # If there are no examples then delete the example words block so it doesn't consume space
+    if not soup.find_all('div', {"class": "wordblock"}):
+        for example in soup.find_all('div', {"class": "examples"}):
+            example.decompose()
 
     for a in soup.findAll('a'):
 
